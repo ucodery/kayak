@@ -521,9 +521,9 @@ pub struct PackageVulnerability {
     pub id: String,
     pub source: String,
     pub link: String,
-    pub aliases: String,
+    pub aliases: Vec<String>,
     pub details: String,
-    pub summary: String,
-    pub fixed_in: String,
+    pub summary: Option<String>,
+    pub fixed_in: Vec<String>,
     pub withdrawn: Option<String>,
 }
