@@ -149,16 +149,11 @@ impl CompatibilityTag {
     }
 
     pub fn is_universal(&self) -> bool {
-        self.python_tag == vec!["py2", "py3"]
+        self.is_pure() && self.python_tag == vec!["py2", "py3"]
     }
 
     pub fn is_pure(&self) -> bool {
-        self.python_tag.iter().all(|p| {
-            "py" == p
-                .chars()
-                .take_while(char::is_ascii_alphabetic)
-                .collect::<String>()
-        })
+        self.for_any_platform() && self.for_any_abi()
     }
 
     pub fn for_any_platform(&self) -> bool {

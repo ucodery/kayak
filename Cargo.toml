@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.2.4", features = ["derive"] }
+colored = "2"
 pep440 = "0.2.0"
 python-pkginfo = "0.5.5"
 regex = "1.8.1"
