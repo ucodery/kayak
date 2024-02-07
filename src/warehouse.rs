@@ -218,6 +218,19 @@ impl Package {
             .filter_map(|c| Classifier::from_str(c).ok())
             .collect()
     }
+
+    /// Return all keywords set on a Package
+    pub fn keywords(&self) -> Vec<String> {
+        if let Some(keywords) = &self.keywords {
+            keywords
+                .split(',')
+                .filter(|&k| !k.is_empty())
+                .map(|k| k.to_string())
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Package {
@@ -349,7 +362,7 @@ impl PackageVersion {
         Ok(response)
     }
 
-    /// Return the validated classifiers set on Package
+    /// Return the validated classifiers set on PackageVersion
     ///
     /// This function may return less results than the classifiers field but
     /// note that pypi.org will reject uploads with classifiers that don't parse
@@ -362,6 +375,19 @@ impl PackageVersion {
             .iter()
             .filter_map(|c| Classifier::from_str(c).ok())
             .collect()
+    }
+
+    /// Return all keywords set on a PackageVersion
+    pub fn keywords(&self) -> Vec<String> {
+        if let Some(keywords) = &self.keywords {
+            keywords
+                .split(',')
+                .filter(|&k| !k.is_empty())
+                .map(|k| k.to_string())
+                .collect()
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn version(&self) -> Result<Version, Error> {

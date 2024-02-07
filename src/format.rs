@@ -55,8 +55,10 @@ fn format_urls(version: &PackageVersion) -> Vec<ColoredString> {
 }
 
 fn format_keywords(version: &PackageVersion) -> ColoredString {
-    if let Some(keywords) = &version.keywords {
-        format!("\n    {keywords}").magenta().bold()
+    let keywords = &version.keywords();
+    if ! keywords.is_empty() {
+        println!("{:?}", keywords);
+        format!("\n    {}", keywords.join(", ")).magenta().bold()
     } else {
         "".normal()
     }
