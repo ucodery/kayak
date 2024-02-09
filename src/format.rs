@@ -1,5 +1,5 @@
 use crate::distribution::WheelName;
-use crate::warehouse::{Package,PackageVersion};
+use crate::warehouse::{Package, PackageVersion};
 use colored::*;
 use std::iter;
 
@@ -56,7 +56,7 @@ fn format_urls(version: &PackageVersion) -> Vec<ColoredString> {
 
 fn format_keywords(version: &PackageVersion) -> ColoredString {
     let keywords = &version.keywords();
-    if ! keywords.is_empty() {
+    if !keywords.is_empty() {
         println!("{:?}", keywords);
         format!("\n    {}", keywords.join(", ")).magenta().bold()
     } else {
@@ -72,59 +72,95 @@ fn format_classifiers(version: &PackageVersion) -> ColoredString {
     }
 }
 
-fn format_distributions(version: &PackageVersion) -> ColoredString {
+fn format_distributions(version: &PackageVersion, details: u8) -> Vec<ColoredString> {
     let sdist = version.urls.iter().any(|u| u.packagetype == "sdist");
     let wheel = version.urls.iter().any(|u| u.packagetype == "bdist_wheel");
     if !(sdist || wheel) {
-        return "".normal();
+        return vec!["".normal()];
     };
 
-    let formatted_sdist = if !sdist {
-        ""
-    } else {
-        if wheel {
+    if details < 2 {
+        let formatted_sdist = if !sdist {
+            ""
+        } else if wheel {
             "source, "
         } else {
             "source"
-        }
-    };
+        };
 
-    let formatted_wheel = if !wheel {
-        "".to_string()
+        let formatted_wheel = if !wheel {
+            "".to_string()
+        } else {
+            let version_wheels = version
+                .urls
+                .iter()
+                .filter_map(|u| u.filename().ok())
+                .collect::<Vec<WheelName>>();
+            if version_wheels
+                .iter()
+                .any(|d| d.compatibility_tag.is_universal())
+            {
+                "universal wheel".to_string()
+            } else {
+                let python_versions = version_wheels
+                    .iter()
+                    .flat_map(|d| d.compatibility_tag.python_tags())
+                    .collect::<Vec<&str>>();
+                let wheel_type = if version_wheels.iter().any(|d| d.compatibility_tag.is_pure()) {
+                    if python_versions.len() == 1 {
+                        "pure wheel"
+                    } else {
+                        "pure wheels"
+                    }
+                } else {
+                    "platform-specific wheel"
+                };
+                if python_versions.contains(&"py3") {
+                    wheel_type.to_string()
+                } else {
+                    format!("{} for {}", wheel_type, python_versions[0])
+                }
+            }
+        };
+        vec![format!("\n    {formatted_sdist}{formatted_wheel}").cyan()]
     } else {
-        let version_wheels = version
+        version
             .urls
             .iter()
-            .filter_map(|u| u.filename().ok())
-            .collect::<Vec<WheelName>>();
-        if version_wheels
-            .iter()
-            .any(|d| d.compatibility_tag.is_universal())
-        {
-            "universal wheel".to_string()
-        } else {
-            let python_versions = version_wheels
-                .iter()
-                .flat_map(|d| d.compatibility_tag.python_tags())
-                .collect::<Vec<&str>>();
-            let wheel_type = if version_wheels.iter().any(|d| d.compatibility_tag.is_pure()) {
-                if python_versions.len() == 1 {
-                    "pure wheel"
+            .filter(|u| u.packagetype == "sdist")
+            .flat_map(|u| {
+                if details > 2 {
+                    vec!["\n    sdist ".cyan(), u.url.cyan().underline()]
                 } else {
-                    "pure wheels"
+                    vec!["\n    sdist".cyan()]
                 }
-            } else {
-                "platform-specific wheel"
-            };
-            if python_versions.contains(&"py3") {
-                wheel_type.to_string()
-            } else {
-                format!("{} for {}", wheel_type, python_versions[0])
-            }
-        }
-    };
-
-    format!("\n    {formatted_sdist}{formatted_wheel}").cyan()
+            })
+            .chain(
+                version
+                    .urls
+                    .iter()
+                    .filter(|u| u.filename().is_ok())
+                    .flat_map(|u| {
+                        if details > 2 {
+                            vec![
+                                format!(
+                                    "\n    {} ",
+                                    u.filename().unwrap().compatibility_tag
+                                )
+                                .cyan(),
+                                u.url.cyan().underline(),
+                            ]
+                        } else {
+                            vec![format!(
+                                "\n    {}",
+                                u.filename().unwrap().compatibility_tag
+                            )
+                            .cyan()]
+                        }
+                    }),
+            )
+            .collect()
+    }
 }
 
 fn format_dependencies(version: &PackageVersion) -> Vec<ColoredString> {
@@ -155,10 +191,10 @@ pub fn format_package_version_details(
     include_urls: bool,
     include_keywords: bool,
     include_classifiers: bool,
-    include_artifacts: bool,
+    include_artifacts: u8,
     include_dependencies: bool,
     include_readme: bool,
-) -> String {
+) -> Vec<ColoredString> {
     let mut display = Vec::new();
 
     if details >= 1 {
@@ -185,8 +221,8 @@ pub fn format_package_version_details(
         display.push(format_classifiers(version));
     };
 
-    if details >= 5 || include_artifacts {
-        display.push(format_distributions(version));
+    if details >= 5 || include_artifacts >= 1 {
+        display.extend(format_distributions(version, include_artifacts));
     };
 
     if details >= 6 || include_dependencies {
@@ -197,17 +233,10 @@ pub fn format_package_version_details(
         display.push(format_readme(version));
     };
 
-    return display
-        .iter()
-        .map(|x| x.to_string())
-        .collect::<Vec<_>>()
-        .join("");
+    display
 }
 
-pub fn format_package_versions(
-    package: &Package,
-    details: u8
-) -> String {
+pub fn format_package_versions(package: &Package, details: u8) -> String {
     let name = if details >= 1 {
         format!("    {}\n", package.name).yellow()
     } else {
