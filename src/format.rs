@@ -1,5 +1,5 @@
-use crate::distribution::WheelName;
-use crate::warehouse::{Package, PackageVersion};
+use crate::distribution::{CompatibilityTag, WheelName};
+use crate::warehouse::{DistributionUrl, Package, PackageVersion};
 use colored::*;
 use std::iter;
 
@@ -64,11 +64,68 @@ fn format_keywords(version: &PackageVersion) -> ColoredString {
     }
 }
 
-fn format_classifiers(version: &PackageVersion) -> ColoredString {
+fn format_classifiers(version: &PackageVersion) -> Vec<ColoredString> {
     if !&version.classifiers.is_empty() {
-        format!("\n    {}", &version.classifiers.join("\n    ")).magenta()
+        version
+            .classifiers
+            .iter()
+            .map(|c| format!("\n    {c}").magenta())
+            .collect()
     } else {
-        "".normal()
+        vec![]
+    }
+}
+
+fn format_bdist(bdist: &DistributionUrl, details: u8) -> Vec<ColoredString> {
+    if let Ok(filename) = bdist.filename() {
+        if details > 2 {
+            vec![
+                format!("\n    {} ", filename.compatibility_tag).cyan(),
+                bdist.url.cyan().underline(),
+            ]
+        } else {
+            vec![format!("\n    {}", filename.compatibility_tag).cyan()]
+        }
+    } else {
+        vec![]
+    }
+}
+
+fn format_sdist(sdist: &DistributionUrl, details: u8) -> Vec<ColoredString> {
+    if details > 2 {
+        vec!["\n    sdist ".cyan(), sdist.url.cyan().underline()]
+    } else {
+        vec!["\n    sdist".cyan()]
+    }
+}
+
+fn format_distribution(
+    version: &PackageVersion,
+    distribution: String,
+    details: u8,
+) -> Vec<ColoredString> {
+    if distribution == "sdist" {
+        if let Some(sdist) = version.urls.iter().find(|u| u.packagetype == "sdist") {
+            format_sdist(sdist, details)
+        } else {
+            vec![]
+        }
+    } else {
+        if let Some(compat) = CompatibilityTag::from_tag(&distribution) {
+            if let Some(bdist) = version
+                .urls
+                .iter()
+                .filter(|u| u.packagetype == "bdist_wheel")
+                .filter(|u| u.filename().is_ok())
+                .find(|u| u.filename().unwrap().compatibility_tag == compat)
+            {
+                format_bdist(bdist, details)
+            } else {
+                vec![]
+            }
+        } else {
+            vec![]
+        }
     }
 }
 
@@ -76,7 +133,7 @@ fn format_distributions(version: &PackageVersion, details: u8) -> Vec<ColoredStr
     let sdist = version.urls.iter().any(|u| u.packagetype == "sdist");
     let wheel = version.urls.iter().any(|u| u.packagetype == "bdist_wheel");
     if !(sdist || wheel) {
-        return vec!["".normal()];
+        return vec![];
     };
 
     if details < 2 {
@@ -127,38 +184,15 @@ fn format_distributions(version: &PackageVersion, details: u8) -> Vec<ColoredStr
         version
             .urls
             .iter()
-            .filter(|u| u.packagetype == "sdist")
             .flat_map(|u| {
-                if details > 2 {
-                    vec!["\n    sdist ".cyan(), u.url.cyan().underline()]
+                if u.packagetype == "sdist" {
+                    format_sdist(u, details)
+                } else if u.packagetype == "bdist_wheel" {
+                    format_bdist(u, details)
                 } else {
-                    vec!["\n    sdist".cyan()]
+                    vec![]
                 }
             })
-            .chain(
-                version
-                    .urls
-                    .iter()
-                    .filter(|u| u.filename().is_ok())
-                    .flat_map(|u| {
-                        if details > 2 {
-                            vec![
-                                format!(
-                                    "\n    {} ",
-                                    u.filename().unwrap().compatibility_tag
-                                )
-                                .cyan(),
-                                u.url.cyan().underline(),
-                            ]
-                        } else {
-                            vec![format!(
-                                "\n    {}",
-                                u.filename().unwrap().compatibility_tag
-                            )
-                            .cyan()]
-                        }
-                    }),
-            )
             .collect()
     }
 }
@@ -185,6 +219,7 @@ fn format_readme(version: &PackageVersion) -> ColoredString {
 
 pub fn format_package_version_details(
     version: &PackageVersion,
+    distribution: Option<String>,
     details: u8,
     include_summary: bool,
     include_license: bool,
@@ -218,11 +253,15 @@ pub fn format_package_version_details(
     };
 
     if details >= 4 || include_classifiers {
-        display.push(format_classifiers(version));
+        display.extend(format_classifiers(version));
     };
 
     if details >= 5 || include_artifacts >= 1 {
-        display.extend(format_distributions(version, include_artifacts));
+        if let Some(dist) = distribution {
+            display.extend(format_distribution(version, dist, include_artifacts));
+        } else {
+            display.extend(format_distributions(version, include_artifacts));
+        };
     };
 
     if details >= 6 || include_dependencies {

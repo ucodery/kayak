@@ -1,10 +1,11 @@
 use crate::format::*;
-use crate::warehouse::PackageVersion;
+use crate::picker::pick_version;
 use clap::Parser;
-use std::cmp::Ordering;
+use pep440::Version;
 
 pub mod distribution;
 pub mod format;
+pub mod picker;
 pub mod warehouse;
 
 #[derive(Parser, Debug)]
@@ -17,6 +18,14 @@ struct Cli {
         long_help = "if not specified, the greatest stable version is automatically retrieved"
     )]
     package_version: Option<String>,
+    #[arg(
+        value_name = "DIST",
+        long_help = "if not specified, a suitable distribution will be automatically retrieved.\n\
+                     If any level of artifact metadata is to be displayed, metadata will only be\n\
+                     displayed for the specified distribution, otherwise for all distributions the\n\
+                     particular version provides"
+    )]
+    dist: Option<String>,
 
     #[arg(
         long,
@@ -117,6 +126,16 @@ struct Cli {
 fn main() -> Result<(), warehouse::Error> {
     let cli = Cli::parse();
 
+    // do sanity checks before making network requests
+    if let Some(v) = &cli.package_version {
+        Version::parse(v).ok_or(warehouse::Error::InvalidVersion)?;
+    };
+    if let Some(d) = &cli.dist {
+        if d != &"sdist" {
+            distribution::CompatibilityTag::from_tag(d).ok_or(warehouse::Error::InvalidVersion)?;
+        };
+    };
+
     let details = if cli.quiet > 1 {
         0
     } else if cli.quiet == 1 {
@@ -135,20 +154,11 @@ fn main() -> Result<(), warehouse::Error> {
         ));
     };
 
-    let version = if let Some(v) = cli.package_version {
-        v
-    } else {
-        warehouse::Package::fetch(warehouse::PYPI_URI, &cli.package)?
-            .ordered_versions()
-            .last()
-            .ok_or(warehouse::Error::NotFound)?
-            .to_string()
-    };
-    let package_version =
-        warehouse::PackageVersion::fetch(warehouse::PYPI_URI, &cli.package, &version)?;
+    let package_version = pick_version(cli.package, cli.package_version)?;
 
     let formatted = format_package_version_details(
         &package_version,
+        cli.dist,
         details,
         cli.summary,
         cli.license,
@@ -159,6 +169,7 @@ fn main() -> Result<(), warehouse::Error> {
         cli.dependencies,
         cli.readme,
     );
+
     Ok(println!(
         "{}",
         formatted
