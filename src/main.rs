@@ -131,7 +131,7 @@ fn main() -> Result<(), warehouse::Error> {
         Version::parse(v).ok_or(warehouse::Error::InvalidVersion)?;
     };
     if let Some(d) = &cli.dist {
-        if d != &"sdist" {
+        if d != "sdist" {
             distribution::CompatibilityTag::from_tag(d).ok_or(warehouse::Error::InvalidVersion)?;
         };
     };

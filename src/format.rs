@@ -110,22 +110,20 @@ fn format_distribution(
         } else {
             vec![]
         }
-    } else {
-        if let Some(compat) = CompatibilityTag::from_tag(&distribution) {
-            if let Some(bdist) = version
-                .urls
-                .iter()
-                .filter(|u| u.packagetype == "bdist_wheel")
-                .filter(|u| u.filename().is_ok())
-                .find(|u| u.filename().unwrap().compatibility_tag == compat)
-            {
-                format_bdist(bdist, details)
-            } else {
-                vec![]
-            }
+    } else if let Some(compat) = CompatibilityTag::from_tag(&distribution) {
+        if let Some(bdist) = version
+            .urls
+            .iter()
+            .filter(|u| u.packagetype == "bdist_wheel")
+            .filter(|u| u.filename().is_ok())
+            .find(|u| u.filename().unwrap().compatibility_tag == compat)
+        {
+            format_bdist(bdist, details)
         } else {
             vec![]
         }
+    } else {
+        vec![]
     }
 }
 
