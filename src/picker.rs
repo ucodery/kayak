@@ -16,6 +16,7 @@ pub fn pick_version(
         None => Ok(warehouse::Package::fetch(warehouse::PYPI_URI, &package)?
             .ordered_versions()
             .iter()
+            .rev()
             .filter_map(|v| {
                 warehouse::PackageVersion::fetch(warehouse::PYPI_URI, &package, &v.to_string()).ok()
             })

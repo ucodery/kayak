@@ -4,6 +4,13 @@ You ought to know about your artifact's key-data.
 
 Easily look up published Python packages' metadata.
 
+## Installing
+
+There are some pre-built binaries available
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf  https://github.com/ucodery/kayak/releases/latest/download/kayak-installer.sh | sh
+```
+
 ## Example
 
 By default the latest published version will be retrieved
@@ -63,5 +70,6 @@ $ kayak requests 1.1.0
 
 Find specific distributions for download
 ```
-$ wget $(kayak requests 2.31.0 --bdist)
+kayak requests 2.31.0 py3-none-any -qaaa
+py3-none-any https://files.pythonhosted.org/packages/70/8e/0e2d847013cb52cd35b38c009bb167a1a26b2ce6cd6965bf26b47bc0bf44/requests-2.31.0-py3-none-any.whl
 ```
