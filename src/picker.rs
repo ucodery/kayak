@@ -16,6 +16,7 @@ pub fn pick_version(
         None => Ok(warehouse::Package::fetch(warehouse::PYPI_URI, &package)?
             .ordered_versions()
             .iter()
+            .rev()
             .filter_map(|v| {
                 warehouse::PackageVersion::fetch(warehouse::PYPI_URI, &package, &v.to_string()).ok()
             })
@@ -59,7 +60,7 @@ fn select_bdist(
         })
 }
 
-fn find_best_bdist(version: &warehouse::PackageVersion) -> Option<&warehouse::DistributionUrl> {
+pub fn pick_best_bdist(version: &warehouse::PackageVersion) -> Option<&warehouse::DistributionUrl> {
     version
         .urls
         .iter()
@@ -92,4 +93,21 @@ fn find_best_bdist(version: &warehouse::PackageVersion) -> Option<&warehouse::Di
                 Ordering::Greater
             }
         })
+}
+
+pub fn pick_dist(
+    version: &warehouse::PackageVersion,
+    distribution: String,
+) -> Result<&warehouse::DistributionUrl, warehouse::Error> {
+    if distribution == "sdist" {
+        version
+            .urls
+            .iter()
+            .find(|u| u.packagetype == "sdist")
+            .ok_or(warehouse::Error::NotFound)
+    } else {
+        let compat = distribution::CompatibilityTag::from_tag(&distribution)
+            .ok_or(warehouse::Error::InvalidName)?;
+        select_bdist(version, compat).ok_or(warehouse::Error::NotFound)
+    }
 }

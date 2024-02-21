@@ -1,10 +1,11 @@
 use crate::format::*;
-use crate::picker::pick_version;
+use crate::picker::{pick_dist, pick_version};
 use clap::Parser;
 use pep440::Version;
 
 pub mod distribution;
 pub mod format;
+pub mod package_inspect;
 pub mod picker;
 pub mod warehouse;
 
@@ -34,6 +35,9 @@ struct Cli {
         long_help = "instead of displaying package details, list all versions available"
     )]
     versions: bool,
+
+    #[arg(long, short = 'z')]
+    zip: Option<String>,
 
     #[arg(
         long,
@@ -104,6 +108,22 @@ struct Cli {
     readme: bool,
     #[arg(
         long,
+        short = 'p',
+        help = "display the package's importable packages",
+        long_help = "display the package's importable top-level names. Not displayed under any\n\
+                     verbosity level"
+    )]
+    packages: bool,
+    #[arg(
+        long,
+        short = 'e',
+        help = "display the package's executable commands",
+        long_help = "display the package's executable file names. Not displayed under any\n\
+                     verbosity level"
+    )]
+    executables: bool,
+    #[arg(
+        long,
         short = 'v',
         action = clap::ArgAction::Count,
         help = "display more package details",
@@ -144,6 +164,15 @@ fn main() -> Result<(), warehouse::Error> {
         cli.verbose + 2
     };
 
+    if let Some(zip) = cli.zip {
+        let pi = package_inspect::fetch(&zip);
+        if let Ok(p) = &pi {
+            println!("{:?}", p.provides_packages());
+            return Ok(());
+        };
+        return Err(warehouse::Error::NotFound);
+    };
+
     if cli.versions {
         return Ok(println!(
             "{}",
@@ -155,10 +184,14 @@ fn main() -> Result<(), warehouse::Error> {
     };
 
     let package_version = pick_version(cli.package, cli.package_version)?;
+    let package_distribution = cli
+        .dist
+        .map(|d| pick_dist(&package_version, d))
+        .transpose()?;
 
     let formatted = format_package_version_details(
         &package_version,
-        cli.dist,
+        package_distribution,
         details,
         cli.summary,
         cli.license,
@@ -168,6 +201,8 @@ fn main() -> Result<(), warehouse::Error> {
         cli.artifacts,
         cli.dependencies,
         cli.readme,
+        cli.packages,
+        cli.executables,
     );
 
     Ok(println!(
