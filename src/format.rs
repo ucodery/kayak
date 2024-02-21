@@ -1,4 +1,6 @@
-use crate::distribution::{CompatibilityTag, WheelName};
+use crate::distribution::WheelName;
+use crate::package_inspect;
+use crate::picker::pick_best_bdist;
 use crate::warehouse::{DistributionUrl, Package, PackageVersion};
 use colored::*;
 use std::iter;
@@ -57,7 +59,6 @@ fn format_urls(version: &PackageVersion) -> Vec<ColoredString> {
 fn format_keywords(version: &PackageVersion) -> ColoredString {
     let keywords = &version.keywords();
     if !keywords.is_empty() {
-        println!("{:?}", keywords);
         format!("\n    {}", keywords.join(", ")).magenta().bold()
     } else {
         "".normal()
@@ -99,29 +100,11 @@ fn format_sdist(sdist: &DistributionUrl, details: u8) -> Vec<ColoredString> {
     }
 }
 
-fn format_distribution(
-    version: &PackageVersion,
-    distribution: String,
-    details: u8,
-) -> Vec<ColoredString> {
-    if distribution == "sdist" {
-        if let Some(sdist) = version.urls.iter().find(|u| u.packagetype == "sdist") {
-            format_sdist(sdist, details)
-        } else {
-            vec![]
-        }
-    } else if let Some(compat) = CompatibilityTag::from_tag(&distribution) {
-        if let Some(bdist) = version
-            .urls
-            .iter()
-            .filter(|u| u.packagetype == "bdist_wheel")
-            .filter(|u| u.filename().is_ok())
-            .find(|u| u.filename().unwrap().compatibility_tag == compat)
-        {
-            format_bdist(bdist, details)
-        } else {
-            vec![]
-        }
+fn format_distribution(distribution: &DistributionUrl, details: u8) -> Vec<ColoredString> {
+    if distribution.packagetype == "sdist" {
+        format_sdist(distribution, details)
+    } else if distribution.packagetype == "bdist_wheel" {
+        format_bdist(distribution, details)
     } else {
         vec![]
     }
@@ -215,9 +198,34 @@ fn format_readme(version: &PackageVersion) -> ColoredString {
     format!("\n{}", version.description.clone().unwrap_or_default()).normal()
 }
 
+fn format_packages(distribution: &DistributionUrl) -> Vec<ColoredString> {
+    if let Ok(inspect) = package_inspect::fetch(&distribution.url) {
+        inspect
+            .provides_packages()
+            .iter()
+            .map(|p| format!("\n    ■ {p}").red())
+            .collect()
+    } else {
+        vec![]
+    }
+}
+
+fn format_executables(distribution: &DistributionUrl) -> Vec<ColoredString> {
+    if let Ok(inspect) = package_inspect::fetch(&distribution.url) {
+        inspect
+            .provides_executables()
+            .iter()
+            .chain(inspect.console_scripts().iter())
+            .map(|p| format!("\n    ▶ {p}").red())
+            .collect()
+    } else {
+        vec![]
+    }
+}
+
 pub fn format_package_version_details(
     version: &PackageVersion,
-    distribution: Option<String>,
+    distribution: Option<&DistributionUrl>,
     details: u8,
     include_summary: bool,
     include_license: bool,
@@ -227,6 +235,8 @@ pub fn format_package_version_details(
     include_artifacts: u8,
     include_dependencies: bool,
     include_readme: bool,
+    include_packages: bool,
+    include_executables: bool,
 ) -> Vec<ColoredString> {
     let mut display = Vec::new();
 
@@ -256,7 +266,7 @@ pub fn format_package_version_details(
 
     if details >= 5 || include_artifacts >= 1 {
         if let Some(dist) = distribution {
-            display.extend(format_distribution(version, dist, include_artifacts));
+            display.extend(format_distribution(dist, include_artifacts));
         } else {
             display.extend(format_distributions(version, include_artifacts));
         };
@@ -265,6 +275,26 @@ pub fn format_package_version_details(
     if details >= 6 || include_dependencies {
         display.extend(format_dependencies(version));
     };
+
+    if include_packages {
+        if let Some(dist) = distribution {
+            if dist.packagetype != "sdist" {
+                display.extend(format_packages(dist));
+            };
+        } else if let Some(dist) = pick_best_bdist(version) {
+            display.extend(format_packages(dist));
+        };
+    }
+
+    if include_executables {
+        if let Some(dist) = distribution {
+            if dist.packagetype != "sdist" {
+                display.extend(format_executables(dist));
+            };
+        } else if let Some(dist) = pick_best_bdist(version) {
+            display.extend(format_executables(dist));
+        };
+    }
 
     if details >= 7 || include_readme {
         display.push(format_readme(version));
