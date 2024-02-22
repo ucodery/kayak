@@ -1,6 +1,8 @@
 [package]
 name = "kayak"
-version = "0.5.0"
+description = "You ought to know about your artifact's key-data"
+homepage = "https://github.com/ucodery/kayak"
+version = "0.6.0"
 edition = "2021"
 repository = "https://github.com/ucodery/kayak"
 
