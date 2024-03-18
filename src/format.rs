@@ -4,6 +4,22 @@ use crate::picker::pick_best_bdist;
 use crate::warehouse::{DistributionUrl, Package, PackageVersion};
 use colored::*;
 use std::iter;
+use termimad::*;
+
+#[derive(Debug)]
+pub struct FormatFields {
+    pub detail_level: u8,
+    pub summary: bool,
+    pub license: bool,
+    pub urls: bool,
+    pub keywords: bool,
+    pub classifiers: bool,
+    pub artifacts: u8,
+    pub dependencies: bool,
+    pub readme: u8,
+    pub packages: bool,
+    pub executables: bool,
+}
 
 fn format_name_version(version: &PackageVersion) -> ColoredString {
     if let Some(_reason) = &version.yanked_reason {
@@ -194,7 +210,14 @@ fn format_dependencies(version: &PackageVersion) -> Vec<ColoredString> {
     deps
 }
 
-fn format_readme(version: &PackageVersion) -> ColoredString {
+fn format_readme(version: &PackageVersion, style: bool) -> ColoredString {
+    if style {
+        if let Some(Ok(content_type)) = version.description_content_type() {
+            if content_type.essence_str() == "text/markdown" {
+                return format!("\n{}", MadSkin::default().term_text(&version.description.clone().unwrap_or_default())).normal();
+            };
+        };
+    };
     format!("\n{}", version.description.clone().unwrap_or_default()).normal()
 }
 
@@ -226,57 +249,47 @@ fn format_executables(distribution: &DistributionUrl) -> Vec<ColoredString> {
 pub fn format_package_version_details(
     version: &PackageVersion,
     distribution: Option<&DistributionUrl>,
-    details: u8,
-    include_summary: bool,
-    include_license: bool,
-    include_urls: bool,
-    include_keywords: bool,
-    include_classifiers: bool,
-    include_artifacts: u8,
-    include_dependencies: bool,
-    include_readme: bool,
-    include_packages: bool,
-    include_executables: bool,
+    format_fields: FormatFields,
 ) -> Vec<ColoredString> {
     let mut display = Vec::new();
 
-    if details >= 1 {
+    if format_fields.detail_level >= 1 {
         display.push(format_name_version(version));
     };
 
-    if details >= 3 || include_license {
+    if format_fields.detail_level >= 3 || format_fields.license {
         display.push(format_license_copyright(version));
     };
 
-    if details >= 2 || include_summary {
+    if format_fields.detail_level >= 2 || format_fields.summary {
         display.push(format_summary(version));
     };
 
-    if details >= 3 || include_urls {
+    if format_fields.detail_level >= 3 || format_fields.urls {
         display.extend(format_urls(version));
     };
 
-    if details >= 4 || include_keywords {
+    if format_fields.detail_level >= 4 || format_fields.keywords {
         display.push(format_keywords(version));
     };
 
-    if details >= 4 || include_classifiers {
+    if format_fields.detail_level >= 4 || format_fields.classifiers {
         display.extend(format_classifiers(version));
     };
 
-    if details >= 5 || include_artifacts >= 1 {
+    if format_fields.detail_level >= 5 || format_fields.artifacts >= 1 {
         if let Some(dist) = distribution {
-            display.extend(format_distribution(dist, include_artifacts));
+            display.extend(format_distribution(dist, format_fields.artifacts));
         } else {
-            display.extend(format_distributions(version, include_artifacts));
+            display.extend(format_distributions(version, format_fields.artifacts));
         };
     };
 
-    if details >= 6 || include_dependencies {
+    if format_fields.detail_level >= 6 || format_fields.dependencies {
         display.extend(format_dependencies(version));
     };
 
-    if include_packages {
+    if format_fields.packages {
         if let Some(dist) = distribution {
             if dist.packagetype != "sdist" {
                 display.extend(format_packages(dist));
@@ -286,7 +299,7 @@ pub fn format_package_version_details(
         };
     }
 
-    if include_executables {
+    if format_fields.executables {
         if let Some(dist) = distribution {
             if dist.packagetype != "sdist" {
                 display.extend(format_executables(dist));
@@ -296,8 +309,9 @@ pub fn format_package_version_details(
         };
     }
 
-    if details >= 7 || include_readme {
-        display.push(format_readme(version));
+    if format_fields.detail_level >= 7 || format_fields.readme >= 1 {
+        let style_readme = format_fields.readme >= 2;
+        display.push(format_readme(version, style_readme));
     };
 
     display

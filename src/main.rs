@@ -1,3 +1,6 @@
+#![deny(unused_crate_dependencies)]
+#![deny(unused_extern_crates)]
+
 use crate::format::*;
 use crate::picker::{pick_dist, pick_version};
 use clap::Parser;
@@ -12,8 +15,10 @@ pub mod warehouse;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
-    package: String,
-
+    #[arg(
+        long_help = "the name of the python project to look up"
+    )]
+    project: String,
     #[arg(
         value_name = "VERSION",
         long_help = "if not specified, the greatest stable version is automatically retrieved"
@@ -31,51 +36,48 @@ struct Cli {
     #[arg(
         long,
         conflicts_with = "package_version",
-        help = "list all versions of this package",
-        long_help = "instead of displaying package details, list all versions available"
+        help = "list all versions of this project",
+        long_help = "instead of displaying project details, list all versions available"
     )]
     versions: bool,
-
-    #[arg(long, short = 'z')]
-    zip: Option<String>,
 
     #[arg(
         long,
         short = 's',
-        help = "display the package's summary",
-        long_help = "force the package's summary to display. This happens by default, unless --quiet\n\
+        help = "display the project's summary",
+        long_help = "force the project's summary to display. This happens by default, unless --quiet\n\
                      was set"
     )]
     summary: bool,
     #[arg(
         long,
         short = 'l',
-        help = "display the package's license",
-        long_help = "force the package's license to display, otherwise requires verbosity 1 before\n\
+        help = "display the project's license",
+        long_help = "force the project's license to display, otherwise requires verbosity 1 before\n\
                      being displayed"
     )]
     license: bool,
     #[arg(
         long,
         short = 'u',
-        help = "display the package's URLs",
-        long_help = "force the package's URLs to display, otherwise requires verbosity 1 before being\n\
+        help = "display the project's URLs",
+        long_help = "force the project's URLs to display, otherwise requires verbosity 1 before being\n\
                      displayed"
     )]
     urls: bool,
     #[arg(
         long,
         short = 'k',
-        help = "display the package's keywords",
-        long_help = "force the package's keywords to display, otherwise requires verbosity 2 before\n\
+        help = "display the project's keywords",
+        long_help = "force the project's keywords to display, otherwise requires verbosity 2 before\n\
                      being displayed"
     )]
     keywords: bool,
     #[arg(
         long,
         short = 'c',
-        help = "display the package's classifiers",
-        long_help = "force the package's classifiers to display, otherwise requires verbosity 2 before\n\
+        help = "display the project's classifiers",
+        long_help = "force the project's classifiers to display, otherwise requires verbosity 2 before\n\
                      being displayed"
     )]
     classifiers: bool,
@@ -83,8 +85,8 @@ struct Cli {
         long,
         short = 'a',
         action = clap::ArgAction::Count,
-        help = "display the package's artifact types",
-        long_help = "force the package's artifact types to display, otherwise requires verbosity 3\n\
+        help = "display the project's artifact types",
+        long_help = "force the project's artifact types to display, otherwise requires verbosity 3\n\
                      before being displayed. This option can be passed up to 3 times, each time will\n\
                      display more details about the artifacts available. Verbosity of level 3 or\n\
                      higher will still only display the first level of artifact detail"
@@ -93,32 +95,34 @@ struct Cli {
     #[arg(
         long,
         short = 'd',
-        help = "display the package's dependencies",
-        long_help = "force the package's dependencies to display, otherwise requires verbosity 4\n\
+        help = "display the project's dependencies",
+        long_help = "force the project's dependencies to display, otherwise requires verbosity 4\n\
                      before being displayed"
     )]
     dependencies: bool,
     #[arg(
         long,
         short = 'r',
-        help = "display the package's readme",
-        long_help = "force the package's readme to display, otherwise requires verbosity 5 before\n\
-                     being displayed"
+        action = clap::ArgAction::Count,
+        help = "display the project's readme",
+        long_help = "force the project's readme to display, otherwise requires verbosity 5 before\n\
+                     being displayed. This option can be passed up to 2 times, if passed twice the\n\
+                     readme will be styled if it is of a known content type"
     )]
-    readme: bool,
+    readme: u8,
     #[arg(
         long,
         short = 'p',
-        help = "display the package's importable packages",
-        long_help = "display the package's importable top-level names. Not displayed under any\n\
+        help = "display the project's importable packages",
+        long_help = "display the project's importable top-level names. Not displayed under any\n\
                      verbosity level"
     )]
     packages: bool,
     #[arg(
         long,
         short = 'e',
-        help = "display the package's executable commands",
-        long_help = "display the package's executable file names. Not displayed under any\n\
+        help = "display the project's executable commands",
+        long_help = "display the project's executable file names. Not displayed under any\n\
                      verbosity level"
     )]
     executables: bool,
@@ -126,8 +130,8 @@ struct Cli {
         long,
         short = 'v',
         action = clap::ArgAction::Count,
-        help = "display more package details",
-        long_help = "display more package details. This option can be passed up to 5 times, each time\n\
+        help = "display more project details",
+        long_help = "display more project details. This option can be passed up to 5 times, each time\n\
                      will display even more details",
     )]
     verbose: u8,
@@ -135,10 +139,10 @@ struct Cli {
         long,
         short = 'q',
         action = clap::ArgAction::Count,
-        help = "display less package details",
-        long_help = "disable displaying any extra package details. This option can be passed up to 2\n\
+        help = "display less project details",
+        long_help = "disable displaying any extra project details. This option can be passed up to 2\n\
                      times, if passed twice and no other details are selected, the command will output\n\
-                     nothing. This option overrides verbosity, but not explicit package detail options",
+                     nothing. This option overrides verbosity, but not explicit project detail options",
     )]
     quiet: u8,
 }
@@ -156,34 +160,37 @@ fn main() -> Result<(), warehouse::Error> {
         };
     };
 
-    let details = if cli.quiet > 1 {
-        0
-    } else if cli.quiet == 1 {
-        1
-    } else {
-        cli.verbose + 2
-    };
-
-    if let Some(zip) = cli.zip {
-        let pi = package_inspect::fetch(&zip);
-        if let Ok(p) = &pi {
-            println!("{:?}", p.provides_packages());
-            return Ok(());
-        };
-        return Err(warehouse::Error::NotFound);
+    let details = match cli.quiet {
+        2.. => 0,
+        1 => 1,
+        _ => cli.verbose + 2,
     };
 
     if cli.versions {
         return Ok(println!(
             "{}",
             format_package_versions(
-                &warehouse::Package::fetch(warehouse::PYPI_URI, &cli.package)?,
+                &warehouse::Package::fetch(warehouse::PYPI_URI, &cli.project)?,
                 details
             )
         ));
     };
 
-    let package_version = pick_version(cli.package, cli.package_version)?;
+    let format_fields = format::FormatFields{
+        detail_level: details,
+        summary: cli.summary,
+        license: cli.license,
+        urls: cli.urls,
+        keywords: cli.keywords,
+        classifiers: cli.classifiers,
+        artifacts: cli.artifacts,
+        dependencies: cli.dependencies,
+        readme: cli.readme,
+        packages: cli.packages,
+        executables: cli.executables,
+    };
+
+    let package_version = pick_version(cli.project, cli.package_version)?;
     let package_distribution = cli
         .dist
         .map(|d| pick_dist(&package_version, d))
@@ -192,17 +199,7 @@ fn main() -> Result<(), warehouse::Error> {
     let formatted = format_package_version_details(
         &package_version,
         package_distribution,
-        details,
-        cli.summary,
-        cli.license,
-        cli.urls,
-        cli.keywords,
-        cli.classifiers,
-        cli.artifacts,
-        cli.dependencies,
-        cli.readme,
-        cli.packages,
-        cli.executables,
+        format_fields,
     );
 
     Ok(println!(

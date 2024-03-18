@@ -4,6 +4,7 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::str::FromStr;
 
+
 use pep440::Version;
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Deserializer};
@@ -44,6 +45,12 @@ impl From<url::ParseError> for Error {
 
 impl From<distribution::Error> for Error {
     fn from(_err: distribution::Error) -> Error {
+        Error::InvalidName
+    }
+}
+
+impl From<mime::FromStrError> for Error {
+    fn from(_err: mime::FromStrError) -> Error {
         Error::InvalidName
     }
 }
@@ -392,6 +399,10 @@ impl PackageVersion {
 
     pub fn version(&self) -> Result<Version, Error> {
         Version::parse(&self.version).ok_or(Error::InvalidVersion)
+    }
+
+    pub fn description_content_type(&self) -> Option<Result<mime::Mime, Error>> {
+        self.description_content_type.as_ref().map(|content_type| content_type.parse().map_err(Into::into))
     }
 }
 
