@@ -5,6 +5,7 @@ use crate::format::*;
 use crate::picker::{pick_dist, pick_version};
 use clap::Parser;
 use pep440::Version;
+use termimad::*;
 
 pub mod distribution;
 pub mod format;
@@ -202,6 +203,7 @@ fn main() -> Result<(), warehouse::Error> {
         format_fields,
     );
 
+    /*
     Ok(println!(
         "{}",
         formatted
@@ -209,5 +211,10 @@ fn main() -> Result<(), warehouse::Error> {
             .map(|x| x.to_string())
             .collect::<Vec<_>>()
             .join("")
-    ))
+            */
+
+    for div in formatted.iter() {
+        print_text(&div.to_string());
+    }
+    Ok(())
 }

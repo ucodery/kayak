@@ -1,3 +1,4 @@
+use core::fmt::Display;
 use crate::distribution::WheelName;
 use crate::package_inspect;
 use crate::picker::pick_best_bdist;
@@ -21,33 +22,59 @@ pub struct FormatFields {
     pub executables: bool,
 }
 
-fn format_name_version(version: &PackageVersion) -> ColoredString {
+fn format_name_version(version: &PackageVersion) -> String {
     if let Some(_reason) = &version.yanked_reason {
-        format!("    {}@{} [YANKED]", &version.name, &version.version).red()
+        format!("    {}@{} [YANKED]", &version.name, &version.version).red().to_string()
     } else {
-        format!("    {}@{}", &version.name, &version.version).yellow()
+        format!("    {}@{}", &version.name, &version.version).yellow().to_string()
     }
 }
 
-fn format_summary(version: &PackageVersion) -> ColoredString {
-    format!("\n    {}", version.summary.clone().unwrap_or_default()).normal()
+fn style_name_version(version: &PackageVersion) -> String {
+    if let Some(_reason) = &version.yanked_reason {
+        format!("# {}@{} [YANKED]", &version.name, &version.version)
+    } else {
+        format!("# {}@{}", &version.name, &version.version)
+    }
 }
 
-fn format_license_copyright(version: &PackageVersion) -> ColoredString {
+fn format_summary(version: &PackageVersion) -> String {
+    format!("\n    {}", version.summary.clone().unwrap_or_default()).normal().to_string()
+}
+
+fn style_summary(version: &PackageVersion) -> String {
+    format!("| {} |", version.summary.clone().unwrap_or_default())
+}
+
+fn format_license_copyright(version: &PackageVersion) -> String {
     if let Some(license) = &version.license {
         if let Some(author_email) = &version.author_email {
-            format!("\n    {license} © {}", author_email.replace('"', "")).yellow()
+            format!("\n    {license} © {}", author_email.replace('"', "")).yellow().to_string()
         } else {
-            format!("\n    {license}").yellow()
+            format!("\n    {license}").yellow().to_string()
         }
     } else if let Some(author_email) = &version.author_email {
-        format!("\n    © {}", author_email.replace('"', "")).yellow()
+        format!("\n    © {}", author_email.replace('"', "")).yellow().to_string()
     } else {
-        "".normal()
+        "".normal().to_string()
     }
 }
 
-fn format_urls(version: &PackageVersion) -> Vec<ColoredString> {
+fn style_license_copyright(version: &PackageVersion) -> String {
+    if let Some(license) = &version.license {
+        if let Some(author_email) = &version.author_email {
+            format!("| {license} © {} |", author_email.replace('"', ""))
+        } else {
+            format!("| {license} |")
+        }
+    } else if let Some(author_email) = &version.author_email {
+        format!("|   © {} |", author_email.replace('"', ""))
+    } else {
+        "".to_string()
+    }
+}
+
+fn format_urls(version: &PackageVersion) -> Vec<String> {
     iter::once((&"Package Index".to_string(), &version.project_url))
         .chain(version.project_urls.iter())
         .flat_map(|url| {
@@ -55,68 +82,68 @@ fn format_urls(version: &PackageVersion) -> Vec<ColoredString> {
                 // pypi.org implements icons for some url types
                 // https://github.com/pypi/warehouse/blob/main/warehouse/templates/packaging/detail.html#L20
                 match url.0.to_ascii_lowercase().as_str() {
-                    "package index" => "\n    📦 ".normal(),
-                    "download" => "\n    ⇩ ".normal(),
-                    "home" | "homepage" | "home page" => "\n    🏠 ".normal(),
+                    "package index" => "\n    📦 ".normal().to_string(),
+                    "download" => "\n    ⇩ ".normal().to_string(),
+                    "home" | "homepage" | "home page" => "\n    🏠 ".normal().to_string(),
                     "changelog" | "change log" | "changes" | "release notes" | "news"
-                    | "what's new" | "history" => "\n    📜 ".normal(),
-                    "docs" | "documentation" => "\n    📄 ".normal(),
-                    "bug" | "issue" | "tracker" | "report" => "\n    🐞 ".normal(),
-                    "funding" | "donate" | "donation" | "sponsor" => "\n    💸 ".normal(),
-                    "mastodon" => "\n    🐘 ".normal(),
-                    _ => "\n    🔗 ".normal(),
+                    | "what's new" | "history" => "\n    📜 ".normal().to_string(),
+                    "docs" | "documentation" => "\n    📄 ".normal().to_string(),
+                    "bug" | "issue" | "tracker" | "report" => "\n    🐞 ".normal().to_string(),
+                    "funding" | "donate" | "donation" | "sponsor" => "\n    💸 ".normal().to_string(),
+                    "mastodon" => "\n    🐘 ".normal().to_string(),
+                    _ => "\n    🔗 ".normal().to_string(),
                 },
-                url.1.blue().underline(),
+                url.1.blue().underline().to_string(),
             ]
         })
         .collect()
 }
 
-fn format_keywords(version: &PackageVersion) -> ColoredString {
+fn format_keywords(version: &PackageVersion) -> String {
     let keywords = &version.keywords();
     if !keywords.is_empty() {
-        format!("\n    {}", keywords.join(", ")).magenta().bold()
+        format!("\n    {}", keywords.join(", ")).magenta().bold().to_string()
     } else {
-        "".normal()
+        "".normal().to_string()
     }
 }
 
-fn format_classifiers(version: &PackageVersion) -> Vec<ColoredString> {
+fn format_classifiers(version: &PackageVersion) -> Vec<String> {
     if !&version.classifiers.is_empty() {
         version
             .classifiers
             .iter()
-            .map(|c| format!("\n    {c}").magenta())
+            .map(|c| format!("\n    {c}").magenta().to_string())
             .collect()
     } else {
         vec![]
     }
 }
 
-fn format_bdist(bdist: &DistributionUrl, details: u8) -> Vec<ColoredString> {
+fn format_bdist(bdist: &DistributionUrl, details: u8) -> Vec<String> {
     if let Ok(filename) = bdist.filename() {
         if details > 2 {
             vec![
-                format!("\n    {} ", filename.compatibility_tag).cyan(),
-                bdist.url.cyan().underline(),
+                format!("\n    {} ", filename.compatibility_tag).cyan().to_string(),
+                bdist.url.cyan().underline().to_string(),
             ]
         } else {
-            vec![format!("\n    {}", filename.compatibility_tag).cyan()]
+            vec![format!("\n    {}", filename.compatibility_tag).cyan().to_string()]
         }
     } else {
         vec![]
     }
 }
 
-fn format_sdist(sdist: &DistributionUrl, details: u8) -> Vec<ColoredString> {
+fn format_sdist(sdist: &DistributionUrl, details: u8) -> Vec<String> {
     if details > 2 {
-        vec!["\n    sdist ".cyan(), sdist.url.cyan().underline()]
+        vec!["\n    sdist ".cyan().to_string(), sdist.url.cyan().underline().to_string()]
     } else {
-        vec!["\n    sdist".cyan()]
+        vec!["\n    sdist".cyan().to_string()]
     }
 }
 
-fn format_distribution(distribution: &DistributionUrl, details: u8) -> Vec<ColoredString> {
+fn format_distribution(distribution: &DistributionUrl, details: u8) -> Vec<String> {
     if distribution.packagetype == "sdist" {
         format_sdist(distribution, details)
     } else if distribution.packagetype == "bdist_wheel" {
@@ -126,7 +153,7 @@ fn format_distribution(distribution: &DistributionUrl, details: u8) -> Vec<Color
     }
 }
 
-fn format_distributions(version: &PackageVersion, details: u8) -> Vec<ColoredString> {
+fn format_distributions(version: &PackageVersion, details: u8) -> Vec<String> {
     let sdist = version.urls.iter().any(|u| u.packagetype == "sdist");
     let wheel = version.urls.iter().any(|u| u.packagetype == "bdist_wheel");
     if !(sdist || wheel) {
@@ -176,7 +203,7 @@ fn format_distributions(version: &PackageVersion, details: u8) -> Vec<ColoredStr
                 }
             }
         };
-        vec![format!("\n    {formatted_sdist}{formatted_wheel}").cyan()]
+        vec![format!("\n    {formatted_sdist}{formatted_wheel}").cyan().to_string()]
     } else {
         version
             .urls
@@ -194,52 +221,52 @@ fn format_distributions(version: &PackageVersion, details: u8) -> Vec<ColoredStr
     }
 }
 
-fn format_dependencies(version: &PackageVersion) -> Vec<ColoredString> {
+fn format_dependencies(version: &PackageVersion) -> Vec<String> {
     let mut deps = Vec::new();
     if let Some(requires_python) = &version.requires_python {
-        deps.push(format!("\n    python{}", requires_python).green())
+        deps.push(format!("\n    python{}", requires_python).green().to_string())
     };
     if !&version.requires_dist.is_empty() {
         deps.extend(
             version
                 .requires_dist
                 .iter()
-                .map(|d| format!("\n    {d}").green()),
+                .map(|d| format!("\n    {d}").green().to_string()),
         )
     };
     deps
 }
 
-fn format_readme(version: &PackageVersion, style: bool) -> ColoredString {
+fn format_readme(version: &PackageVersion, style: bool) -> String {
     if style {
         if let Some(Ok(content_type)) = version.description_content_type() {
             if content_type.essence_str() == "text/markdown" {
-                return format!("\n{}", MadSkin::default().term_text(&version.description.clone().unwrap_or_default())).normal();
+                return format!("\n{}", MadSkin::default().term_text(&version.description.clone().unwrap_or_default())).normal().to_string();
             };
         };
     };
-    format!("\n{}", version.description.clone().unwrap_or_default()).normal()
+    format!("\n{}", version.description.clone().unwrap_or_default()).normal().to_string()
 }
 
-fn format_packages(distribution: &DistributionUrl) -> Vec<ColoredString> {
+fn format_packages(distribution: &DistributionUrl) -> Vec<String> {
     if let Ok(inspect) = package_inspect::fetch(&distribution.url) {
         inspect
             .provides_packages()
             .iter()
-            .map(|p| format!("\n    ■ {p}").red())
+            .map(|p| format!("\n    ■ {p}").red().to_string())
             .collect()
     } else {
         vec![]
     }
 }
 
-fn format_executables(distribution: &DistributionUrl) -> Vec<ColoredString> {
+fn format_executables(distribution: &DistributionUrl) -> Vec<String> {
     if let Ok(inspect) = package_inspect::fetch(&distribution.url) {
         inspect
             .provides_executables()
             .iter()
             .chain(inspect.console_scripts().iter())
-            .map(|p| format!("\n    ▶ {p}").red())
+            .map(|p| format!("\n    ▶ {p}").red().to_string())
             .collect()
     } else {
         vec![]
@@ -250,24 +277,32 @@ pub fn format_package_version_details(
     version: &PackageVersion,
     distribution: Option<&DistributionUrl>,
     format_fields: FormatFields,
-) -> Vec<ColoredString> {
+) -> Vec<impl Display> {
     let mut display = Vec::new();
 
     if format_fields.detail_level >= 1 {
-        display.push(format_name_version(version));
+        display.push(style_name_version(version));
     };
+
+    display.push("|:-:|".to_string());
 
     if format_fields.detail_level >= 3 || format_fields.license {
-        display.push(format_license_copyright(version));
+        display.push(style_license_copyright(version));
     };
 
+    display.push("|:-:|".to_string());
+
     if format_fields.detail_level >= 2 || format_fields.summary {
-        display.push(format_summary(version));
+        display.push(style_summary(version));
     };
 
     if format_fields.detail_level >= 3 || format_fields.urls {
         display.extend(format_urls(version));
     };
+
+    display.push("| -".to_string());
+    let skin = MadSkin::default();
+    return vec!(skin.term_text(&display.join("\n")).to_string());
 
     if format_fields.detail_level >= 4 || format_fields.keywords {
         display.push(format_keywords(version));
@@ -317,7 +352,7 @@ pub fn format_package_version_details(
     display
 }
 
-pub fn format_package_versions(package: &Package, details: u8) -> String {
+pub fn format_package_versions(package: &Package, details: u8) -> impl Display {
     let name = if details >= 1 {
         format!("    {}\n", package.name).yellow()
     } else {
