@@ -1,9 +1,9 @@
-use core::fmt::Display;
 use crate::distribution::WheelName;
 use crate::package_inspect;
 use crate::picker::pick_best_bdist;
 use crate::warehouse::{DistributionUrl, Package, PackageVersion};
 use colored::*;
+use core::fmt::Display;
 use std::iter;
 use termimad::*;
 
@@ -24,9 +24,13 @@ pub struct FormatFields {
 
 fn format_name_version(version: &PackageVersion) -> String {
     if let Some(_reason) = &version.yanked_reason {
-        format!("    {}@{} [YANKED]", &version.name, &version.version).red().to_string()
+        format!("    {}@{} [YANKED]", &version.name, &version.version)
+            .red()
+            .to_string()
     } else {
-        format!("    {}@{}", &version.name, &version.version).yellow().to_string()
+        format!("    {}@{}", &version.name, &version.version)
+            .yellow()
+            .to_string()
     }
 }
 
@@ -39,38 +43,53 @@ fn style_name_version(version: &PackageVersion) -> String {
 }
 
 fn format_summary(version: &PackageVersion) -> String {
-    format!("\n    {}", version.summary.clone().unwrap_or_default()).normal().to_string()
+    format!("\n    {}", version.summary.clone().unwrap_or_default())
+        .normal()
+        .to_string()
 }
 
-fn style_summary(version: &PackageVersion) -> String {
-    format!("| {} |", version.summary.clone().unwrap_or_default())
+fn style_summary(version: &PackageVersion) -> Vec<String> {
+    vec![
+        "|:-:|".to_string(),
+        format!("| {} |", version.summary.clone().unwrap_or_default()),
+    ]
 }
 
 fn format_license_copyright(version: &PackageVersion) -> String {
     if let Some(license) = &version.license {
         if let Some(author_email) = &version.author_email {
-            format!("\n    {license} © {}", author_email.replace('"', "")).yellow().to_string()
+            format!("\n    {license} © {}", author_email.replace('"', ""))
+                .yellow()
+                .to_string()
         } else {
             format!("\n    {license}").yellow().to_string()
         }
     } else if let Some(author_email) = &version.author_email {
-        format!("\n    © {}", author_email.replace('"', "")).yellow().to_string()
+        format!("\n    © {}", author_email.replace('"', ""))
+            .yellow()
+            .to_string()
     } else {
         "".normal().to_string()
     }
 }
 
-fn style_license_copyright(version: &PackageVersion) -> String {
+fn style_license_copyright(version: &PackageVersion) -> Vec<String> {
     if let Some(license) = &version.license {
         if let Some(author_email) = &version.author_email {
-            format!("| {license} © {} |", author_email.replace('"', ""))
+            vec![
+                "|:-:|:-:|".to_string(),
+                format!("| {license} | © {} |", author_email.replace('"', "")),
+            ]
         } else {
-            format!("| {license} |")
+            vec!["|:-:|".to_string(), format!("| {license} |")]
         }
     } else if let Some(author_email) = &version.author_email {
-        format!("|   © {} |", author_email.replace('"', ""))
+        vec![
+            "|:-:|".to_string(),
+            format!("| © {} |", author_email.replace('"', "")),
+        ]
     } else {
-        "".to_string()
+        vec![]
     }
 }
 
@@ -89,7 +108,9 @@ fn format_urls(version: &PackageVersion) -> Vec<String> {
                     | "what's new" | "history" => "\n    📜 ".normal().to_string(),
                     "docs" | "documentation" => "\n    📄 ".normal().to_string(),
                     "bug" | "issue" | "tracker" | "report" => "\n    🐞 ".normal().to_string(),
-                    "funding" | "donate" | "donation" | "sponsor" => "\n    💸 ".normal().to_string(),
+                    "funding" | "donate" | "donation" | "sponsor" => {
+                        "\n    💸 ".normal().to_string()
+                    }
                     "mastodon" => "\n    🐘 ".normal().to_string(),
                     _ => "\n    🔗 ".normal().to_string(),
                 },
@@ -99,12 +120,46 @@ fn format_urls(version: &PackageVersion) -> Vec<String> {
         .collect()
 }
 
+fn style_urls(version: &PackageVersion) -> Vec<String> {
+    iter::once("|:-|".to_string())
+        .chain(iter::once(format!("| 📦 _{}_ |", version.project_url)))
+        .chain(version.project_urls.iter().map(|url| {
+            // pypi.org implements icons for some url types
+            // https://github.com/pypi/warehouse/blob/main/warehouse/templates/packaging/detail.html#L20
+            match url.0.to_ascii_lowercase().as_str() {
+                "package index" => format!("| 📦 _{}_ |", url.1),
+                "download" => format!("| ⇩ _{}_ |", url.1),
+                "home" | "homepage" | "home page" => format!("| 🏠 _{}_ |", url.1),
+                "changelog" | "change log" | "changes" | "release notes" | "news"
+                | "what's new" | "history" => format!("| 📜 _{}_ |", url.1),
+                "docs" | "documentation" => format!("| 📄 _{}_ |", url.1),
+                "bug" | "issue" | "tracker" | "report" => format!("| 🐞 _{}_ |", url.1),
+                "funding" | "donate" | "donation" | "sponsor" => format!("| 💸 _{}_ |", url.1),
+                "mastodon" => format!("| 🐘 _{}_ |", url.1),
+                _ => format!("| 🔗 _{}_ |", url.1),
+            }
+        }))
+        .collect()
+}
+
 fn format_keywords(version: &PackageVersion) -> String {
     let keywords = &version.keywords();
     if !keywords.is_empty() {
-        format!("\n    {}", keywords.join(", ")).magenta().bold().to_string()
+        format!("\n    {}", keywords.join(", "))
+            .magenta()
+            .bold()
+            .to_string()
     } else {
         "".normal().to_string()
+    }
+}
+
+fn style_keywords(version: &PackageVersion) -> Vec<String> {
+    let keywords = &version.keywords();
+    if !keywords.is_empty() {
+        vec!["|:-|".to_string(), format!("| {} |", keywords.join(" "))]
+    } else {
+        vec![]
     }
 }
 
@@ -120,15 +175,32 @@ fn format_classifiers(version: &PackageVersion) -> Vec<String> {
     }
 }
 
+fn style_classifiers(version: &PackageVersion) -> Vec<String> {
+    let classifiers = &version.classifiers();
+    if !classifiers.is_empty() {
+        iter::once("|:-|".to_string())
+            .chain(
+                classifiers.iter().map(|c| format!("| {} |", c))
+                )
+            .collect::<Vec<_>>()
+    } else {
+        vec![]
+    }
+}
+
 fn format_bdist(bdist: &DistributionUrl, details: u8) -> Vec<String> {
     if let Ok(filename) = bdist.filename() {
         if details > 2 {
             vec![
-                format!("\n    {} ", filename.compatibility_tag).cyan().to_string(),
+                format!("\n    {} ", filename.compatibility_tag)
+                    .cyan()
+                    .to_string(),
                 bdist.url.cyan().underline().to_string(),
             ]
         } else {
-            vec![format!("\n    {}", filename.compatibility_tag).cyan().to_string()]
+            vec![format!("\n    {}", filename.compatibility_tag)
+                .cyan()
+                .to_string()]
         }
     } else {
         vec![]
@@ -137,7 +209,10 @@ fn format_bdist(bdist: &DistributionUrl, details: u8) -> Vec<String> {
 
 fn format_sdist(sdist: &DistributionUrl, details: u8) -> Vec<String> {
     if details > 2 {
-        vec!["\n    sdist ".cyan().to_string(), sdist.url.cyan().underline().to_string()]
+        vec![
+            "\n    sdist ".cyan().to_string(),
+            sdist.url.cyan().underline().to_string(),
+        ]
     } else {
         vec!["\n    sdist".cyan().to_string()]
     }
@@ -148,6 +223,40 @@ fn format_distribution(distribution: &DistributionUrl, details: u8) -> Vec<Strin
         format_sdist(distribution, details)
     } else if distribution.packagetype == "bdist_wheel" {
         format_bdist(distribution, details)
+    } else {
+        vec![]
+    }
+}
+
+fn style_distribution(distribution: &DistributionUrl, details: u8) -> Vec<String> {
+    if distribution.packagetype == "sdist" {
+        if details > 2 {
+            vec![
+                "|:-|".to_string(),
+                format!("| sdist | _{}_ |", distribution.url)
+            ]
+        } else {
+            vec![
+                "|:-|".to_string(),
+                "| sdist |".to_string()
+            ]
+        }
+    } else if distribution.packagetype == "bdist_wheel" {
+        if let Ok(filename) = distribution.filename() {
+            if details > 2 {
+                vec![
+                    "|:-|".to_string(),
+                    format!("| {} | {} |", filename.compatibility_tag, distribution.url)
+                ]
+            } else {
+                vec![
+                    "|:-|".to_string(),
+                    format!("| {} |", filename.compatibility_tag)
+                ]
+            }
+        } else {
+            vec![]
+        }
     } else {
         vec![]
     }
@@ -203,7 +312,79 @@ fn format_distributions(version: &PackageVersion, details: u8) -> Vec<String> {
                 }
             }
         };
-        vec![format!("\n    {formatted_sdist}{formatted_wheel}").cyan().to_string()]
+        vec![format!("\n    {formatted_sdist}{formatted_wheel}")
+            .cyan()
+            .to_string()]
+    } else {
+        version
+            .urls
+            .iter()
+            .flat_map(|u| {
+                if u.packagetype == "sdist" {
+                    format_sdist(u, details)
+                } else if u.packagetype == "bdist_wheel" {
+                    format_bdist(u, details)
+                } else {
+                    vec![]
+                }
+            })
+            .collect()
+    }
+}
+
+fn style_distributions(version: &PackageVersion, details: u8) -> Vec<String> {
+    let sdist = version.urls.iter().any(|u| u.packagetype == "sdist");
+    let wheel = version.urls.iter().any(|u| u.packagetype == "bdist_wheel");
+    if !(sdist || wheel) {
+        return vec![];
+    };
+
+    if details < 2 {
+        let formatted_sdist = if !sdist {
+            ""
+        } else if wheel {
+            "source, "
+        } else {
+            "source"
+        };
+
+        let formatted_wheel = if !wheel {
+            "".to_string()
+        } else {
+            let version_wheels = version
+                .urls
+                .iter()
+                .filter_map(|u| u.filename().ok())
+                .collect::<Vec<WheelName>>();
+            if version_wheels
+                .iter()
+                .any(|d| d.compatibility_tag.is_universal())
+            {
+                "universal wheel".to_string()
+            } else {
+                let python_versions = version_wheels
+                    .iter()
+                    .flat_map(|d| d.compatibility_tag.python_tags())
+                    .collect::<Vec<&str>>();
+                let wheel_type = if version_wheels.iter().any(|d| d.compatibility_tag.is_pure()) {
+                    if python_versions.len() == 1 {
+                        "pure wheel"
+                    } else {
+                        "pure wheels"
+                    }
+                } else {
+                    "platform-specific wheel"
+                };
+                if python_versions.contains(&"py3") {
+                    wheel_type.to_string()
+                } else {
+                    format!("{} for {}", wheel_type, python_versions[0])
+                }
+            }
+        };
+        vec![format!("\n    {formatted_sdist}{formatted_wheel}")
+            .cyan()
+            .to_string()]
     } else {
         version
             .urls
@@ -224,7 +405,11 @@ fn format_distributions(version: &PackageVersion, details: u8) -> Vec<String> {
 fn format_dependencies(version: &PackageVersion) -> Vec<String> {
     let mut deps = Vec::new();
     if let Some(requires_python) = &version.requires_python {
-        deps.push(format!("\n    python{}", requires_python).green().to_string())
+        deps.push(
+            format!("\n    python{}", requires_python)
+                .green()
+                .to_string(),
+        )
     };
     if !&version.requires_dist.is_empty() {
         deps.extend(
@@ -241,11 +426,18 @@ fn format_readme(version: &PackageVersion, style: bool) -> String {
     if style {
         if let Some(Ok(content_type)) = version.description_content_type() {
             if content_type.essence_str() == "text/markdown" {
-                return format!("\n{}", MadSkin::default().term_text(&version.description.clone().unwrap_or_default())).normal().to_string();
+                return format!(
+                    "\n{}",
+                    MadSkin::default().term_text(&version.description.clone().unwrap_or_default())
+                )
+                .normal()
+                .to_string();
             };
         };
     };
-    format!("\n{}", version.description.clone().unwrap_or_default()).normal().to_string()
+    format!("\n{}", version.description.clone().unwrap_or_default())
+        .normal()
+        .to_string()
 }
 
 fn format_packages(distribution: &DistributionUrl) -> Vec<String> {
@@ -284,37 +476,34 @@ pub fn format_package_version_details(
         display.push(style_name_version(version));
     };
 
-    display.push("|:-:|".to_string());
-
     if format_fields.detail_level >= 3 || format_fields.license {
-        display.push(style_license_copyright(version));
+        display.extend(style_license_copyright(version));
     };
 
-    display.push("|:-:|".to_string());
-
     if format_fields.detail_level >= 2 || format_fields.summary {
-        display.push(style_summary(version));
+        display.extend(style_summary(version));
     };
 
     if format_fields.detail_level >= 3 || format_fields.urls {
-        display.extend(format_urls(version));
+        display.extend(style_urls(version));
     };
 
-    display.push("| -".to_string());
-    let skin = MadSkin::default();
-    return vec!(skin.term_text(&display.join("\n")).to_string());
-
     if format_fields.detail_level >= 4 || format_fields.keywords {
-        display.push(format_keywords(version));
+        display.extend(style_keywords(version));
     };
 
     if format_fields.detail_level >= 4 || format_fields.classifiers {
-        display.extend(format_classifiers(version));
+        display.extend(style_classifiers(version));
     };
+
+    display.push("| -".to_string());
+    return vec![MadSkin::default()
+        .term_text(&display.join("\n"))
+        .to_string()];
 
     if format_fields.detail_level >= 5 || format_fields.artifacts >= 1 {
         if let Some(dist) = distribution {
-            display.extend(format_distribution(dist, format_fields.artifacts));
+            display.extend(style_distribution(dist, format_fields.artifacts));
         } else {
             display.extend(format_distributions(version, format_fields.artifacts));
         };

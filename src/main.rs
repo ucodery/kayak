@@ -16,9 +16,7 @@ pub mod warehouse;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
-    #[arg(
-        long_help = "the name of the python project to look up"
-    )]
+    #[arg(long_help = "the name of the python project to look up")]
     project: String,
     #[arg(
         value_name = "VERSION",
@@ -177,7 +175,7 @@ fn main() -> Result<(), warehouse::Error> {
         ));
     };
 
-    let format_fields = format::FormatFields{
+    let format_fields = format::FormatFields {
         detail_level: details,
         summary: cli.summary,
         license: cli.license,
@@ -197,11 +195,8 @@ fn main() -> Result<(), warehouse::Error> {
         .map(|d| pick_dist(&package_version, d))
         .transpose()?;
 
-    let formatted = format_package_version_details(
-        &package_version,
-        package_distribution,
-        format_fields,
-    );
+    let formatted =
+        format_package_version_details(&package_version, package_distribution, format_fields);
 
     /*
     Ok(println!(

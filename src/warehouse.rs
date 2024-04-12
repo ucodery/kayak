@@ -4,7 +4,6 @@
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::str::FromStr;
 
-
 use pep440::Version;
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Deserializer};
@@ -402,7 +401,9 @@ impl PackageVersion {
     }
 
     pub fn description_content_type(&self) -> Option<Result<mime::Mime, Error>> {
-        self.description_content_type.as_ref().map(|content_type| content_type.parse().map_err(Into::into))
+        self.description_content_type
+            .as_ref()
+            .map(|content_type| content_type.parse().map_err(Into::into))
     }
 }
 
