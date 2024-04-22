@@ -1,16 +1,15 @@
 #![deny(unused_crate_dependencies)]
 #![deny(unused_extern_crates)]
 
-use crate::format::*;
-use crate::picker::{pick_dist, pick_version};
-use clap::Parser;
+use crate::picker::Project;
+use crate::ui::{interactive, pretty, text};
+use clap::{Parser, ValueEnum};
 use pep440::Version;
-use termimad::*;
 
 pub mod distribution;
-pub mod format;
 pub mod package_inspect;
 pub mod picker;
+pub mod ui;
 pub mod warehouse;
 
 #[derive(Parser, Debug)]
@@ -144,6 +143,44 @@ struct Cli {
                      nothing. This option overrides verbosity, but not explicit project detail options",
     )]
     quiet: u8,
+
+    #[arg(
+        long,
+        value_enum,
+        default_value_t=Format::Pretty,
+        help = "output format to display project key-data",
+        long_help = "select the output format:\n\
+                     pretty: write key-data using tables and colors directly to stdout\n\
+                     interactive: write key-data using tables and colors to an alternate screen.\n\
+                     \t\tthis mode can accept further command to update the display interactively",
+    )]
+    format: Format,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+enum Format {
+    //Plain,
+    //NoColor,
+    Text,
+    Pretty,
+    Interactive,
+    //Json,
+}
+
+#[derive(Debug)]
+pub struct DisplayFields {
+    pub name: bool,
+    pub versions: bool,
+    pub summary: bool,
+    pub license: bool,
+    pub urls: bool,
+    pub keywords: bool,
+    pub classifiers: bool,
+    pub artifacts: u8,
+    pub dependencies: bool,
+    pub readme: u8,
+    pub packages: bool,
+    pub executables: bool,
 }
 
 fn main() -> Result<(), warehouse::Error> {
@@ -159,57 +196,42 @@ fn main() -> Result<(), warehouse::Error> {
         };
     };
 
-    let details = match cli.quiet {
-        2.. => 0,
-        1 => 1,
-        _ => cli.verbose + 2,
-    };
-
-    if cli.versions {
-        return Ok(println!(
-            "{}",
-            format_package_versions(
-                &warehouse::Package::fetch(warehouse::PYPI_URI, &cli.project)?,
-                details
-            )
-        ));
-    };
-
-    let format_fields = format::FormatFields {
-        detail_level: details,
-        summary: cli.summary,
-        license: cli.license,
-        urls: cli.urls,
-        keywords: cli.keywords,
-        classifiers: cli.classifiers,
-        artifacts: cli.artifacts,
-        dependencies: cli.dependencies,
-        readme: cli.readme,
+    // quiet and verbosity are quick ways to turn on/off output
+    // map them to real fields here
+    let display_fields = DisplayFields {
+        name: cli.quiet < 2,
+        versions: cli.versions,
+        summary: cli.quiet < 1 || cli.summary,
+        license: cli.verbose >= 1 && cli.quiet < 1 || cli.license,
+        urls: cli.verbose >= 1 && cli.quiet < 1 || cli.urls,
+        keywords: cli.verbose >= 2 && cli.quiet < 1 || cli.keywords,
+        classifiers: cli.verbose >= 2 && cli.quiet < 1 || cli.classifiers,
+        artifacts: if cli.artifacts > 0 {
+            cli.artifacts
+        } else if cli.verbose >= 3 && cli.quiet < 1 {
+            1
+        } else {
+            0
+        },
+        dependencies: cli.verbose >= 4 && cli.quiet < 1 || cli.dependencies,
+        readme: if cli.readme > 0 {
+            cli.readme
+        } else if cli.verbose >= 5 && cli.quiet < 1 {
+            1
+        } else {
+            0
+        },
         packages: cli.packages,
         executables: cli.executables,
     };
 
-    let package_version = pick_version(cli.project, cli.package_version)?;
-    let package_distribution = cli
-        .dist
-        .map(|d| pick_dist(&package_version, d))
-        .transpose()?;
+    let project = Project::new(cli.project, cli.package_version, cli.dist);
 
-    let formatted =
-        format_package_version_details(&package_version, package_distribution, format_fields);
+    match cli.format {
+        Format::Text => text::display(project, display_fields)?,
+        Format::Pretty => pretty::display(project, display_fields)?,
+        Format::Interactive => interactive::run(project, display_fields)?,
+    };
 
-    /*
-    Ok(println!(
-        "{}",
-        formatted
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>()
-            .join("")
-            */
-
-    for div in formatted.iter() {
-        print_text(&div.to_string());
-    }
     Ok(())
 }

@@ -483,7 +483,7 @@ impl<'de> Deserialize<'de> for PackageVersion {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DistributionUrl {
     pub digests: DistributionDigest,
     pub filename: String,
@@ -547,7 +547,7 @@ impl<'de> Deserialize<'de> for DistributionUrl {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct DistributionDigest {
     pub blake2b_256: String,
     pub md5: String,
