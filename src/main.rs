@@ -85,7 +85,7 @@ struct Cli {
         action = clap::ArgAction::Count,
         help = "display the project's artifact types",
         long_help = "force the project's artifact types to display, otherwise requires verbosity 3\n\
-                     before being displayed. This option can be passed up to 3 times, each time will\n\
+                     before being displayed. This option can be passed up to 4 times, each time will\n\
                      display more details about the artifacts available. Verbosity of level 3 or\n\
                      higher will still only display the first level of artifact detail"
     )]
@@ -160,7 +160,6 @@ struct Cli {
 #[derive(ValueEnum, Debug, Clone)]
 enum Format {
     //Plain,
-    //NoColor,
     Text,
     Pretty,
     Interactive,
@@ -171,6 +170,7 @@ enum Format {
 pub struct DisplayFields {
     pub name: bool,
     pub versions: bool,
+    pub time: bool,
     pub summary: bool,
     pub license: bool,
     pub urls: bool,
@@ -201,6 +201,7 @@ fn main() -> Result<(), warehouse::Error> {
     let display_fields = DisplayFields {
         name: cli.quiet < 2,
         versions: cli.versions,
+        time: cli.dist.is_some() || (cli.verbose >= 1 && cli.quiet < 1),
         summary: cli.quiet < 1 || cli.summary,
         license: cli.verbose >= 1 && cli.quiet < 1 || cli.license,
         urls: cli.verbose >= 1 && cli.quiet < 1 || cli.urls,

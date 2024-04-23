@@ -2,6 +2,7 @@ use crate::package_inspect;
 use crate::ui::*;
 use crate::warehouse::{DistributionUrl, Error, PackageVersion};
 use crate::{DisplayFields, Project};
+use chrono::{DateTime, Utc};
 use std::iter;
 use termimad::*;
 
@@ -10,6 +11,21 @@ fn format_name_version(version: &PackageVersion) -> String {
         format!("{}@{} [YANKED]", &version.name, &version.version)
     } else {
         format!("{}@{}", &version.name, &version.version)
+    }
+}
+
+fn format_dist_time(version: &PackageVersion, distribution: Option<&DistributionUrl>) -> String {
+    if let Some(dist) = distribution {
+        format!("{}@{}", format_dist(dist, 0), dist.upload_time)
+    } else if let Some(time) = version
+        .urls
+        .iter()
+        .filter_map(|u| u.upload_time_iso_8601.parse::<DateTime<Utc>>().ok())
+        .min()
+    {
+        format!("  {}", time.format("%Y-%m-%dT%H:%M:%S"))
+    } else {
+        "".to_string()
     }
 }
 
@@ -36,7 +52,7 @@ fn format_urls(version: &PackageVersion) -> Vec<String> {
         .chain(
             iter::once((&"Package Index".to_string(), &version.project_url))
                 .chain(version.project_urls.iter())
-                .map(|url| format!("  {}  {}", iconify_url(url.0), url.1)),
+                .map(|url| format!("  {}  {}", iconify_url(url), url.1)),
         )
         .collect()
 }
@@ -62,13 +78,22 @@ fn format_classifiers(version: &PackageVersion) -> Vec<String> {
 
 fn format_dist(dist: &DistributionUrl, details: u8) -> String {
     if dist.packagetype == "sdist" {
-        if details > 2 {
+        if details > 3 {
+            format!("  sdist {} {}", dist.upload_time, dist.url)
+        } else if details == 3 {
             format!("  sdist {}", dist.url)
         } else {
             "  sdist".to_string()
         }
     } else if dist.packagetype == "bdist_wheel" {
-        if details > 2 {
+        if details > 3 {
+            format!(
+                "  {} {} {}",
+                dist.filename().unwrap().compatibility_tag,
+                dist.upload_time,
+                dist.url
+            )
+        } else if details == 3 {
             format!(
                 "  {} {}",
                 dist.filename().unwrap().compatibility_tag,
@@ -175,6 +200,11 @@ fn format_package_version_details(
 
     if display_fields.name {
         display.push(format_name_version(project.version()?));
+    };
+
+    if display_fields.time || project.distribution_was_selected() {
+        let dist = (project.distribution_was_selected()).then_some(project.distribution()?.clone());
+        display.push(format_dist_time(project.version()?, dist.as_ref()));
     };
 
     if display_fields.license {

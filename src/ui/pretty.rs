@@ -1,6 +1,7 @@
 use crate::ui::*;
 use crate::warehouse::{DistributionUrl, Error, PackageVersion};
 use crate::{DisplayFields, Project};
+use chrono::{DateTime, Utc};
 use ratatui::layout::*;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
@@ -101,6 +102,45 @@ fn render_distribution<'a>(
     }
 }
 
+fn render_time<'a>(
+    display_fields: &DisplayFields,
+    project: &mut Project,
+) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+    if !display_fields.time {
+        Ok(None)
+    } else if project.distribution_was_selected() {
+        Ok(Some((
+            Constraint::Length(1),
+            Paragraph::new(Line::from(Span::styled(
+                project.distribution()?.upload_time.clone(),
+                Style::new().bold().reversed(),
+            )))
+            .centered(),
+        )))
+    } else {
+        // cannot use project.distribution() as this should report the earliest upload time, not
+        // the time of the best-fit distribution
+        if let Some(time) = project
+            .version()?
+            .urls
+            .iter()
+            .filter_map(|u| u.upload_time_iso_8601.parse::<DateTime<Utc>>().ok())
+            .min()
+        {
+            Ok(Some((
+                Constraint::Length(1),
+                Paragraph::new(Line::from(Span::styled(
+                    time.format("%Y-%m-%dT%H:%M:%S").to_string(),
+                    Style::new().bold().reversed(),
+                )))
+                .centered(),
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
 fn render_license_copyright<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
@@ -171,7 +211,7 @@ fn render_urls<'a>(
                 .chain(version.project_urls.iter())
                 .map(|url| {
                     Line::from(vec![
-                        iconify_url(url.0).into(),
+                        iconify_url(url).into(),
                         "  ".into(),
                         Span::styled(
                             url.1.to_string(),
@@ -233,6 +273,9 @@ fn render_artifacts<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
 ) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+    if display_fields.artifacts == 0 {
+        return Ok(None);
+    }
     let artifacts: Box<dyn Iterator<Item = &DistributionUrl>> =
         if project.distribution_was_selected() {
             Box::new(iter::once(project.distribution()?))
@@ -264,7 +307,18 @@ fn render_artifacts<'a>(
                     return None;
                 };
 
-                if display_fields.artifacts > 2 {
+                if display_fields.artifacts > 3 {
+                    Some(Line::from(vec![
+                        tag,
+                        " ".into(),
+                        artifact.upload_time.clone().into(),
+                        " ".into(),
+                        Span::styled(
+                            artifact.url.clone(),
+                            Style::new().blue().add_modifier(Modifier::UNDERLINED),
+                        ),
+                    ]))
+                } else if display_fields.artifacts == 3 {
                     Some(Line::from(vec![
                         tag,
                         " ".into(),
@@ -300,18 +354,27 @@ fn render_dependencies<'a>(
     if !display_fields.dependencies {
         return Ok(None);
     }
-    let dependencies = project.version()?.requires_python.clone()
-                    .into_iter()
-                    .map(|p| format!("python{p}"))
-                    .chain(project.version()?.requires_dist.iter().map(|d| d.to_string()))
-                    .map(|d| Line::from(d))
-                    .collect::<Vec<_>>();
+    let dependencies = project
+        .version()?
+        .requires_python
+        .clone()
+        .into_iter()
+        .map(|p| format!("python{p}"))
+        .chain(
+            project
+                .version()?
+                .requires_dist
+                .iter()
+                .map(|d| d.to_string()),
+        )
+        .map(Line::from)
+        .collect::<Vec<_>>();
     if !dependencies.is_empty() {
         Ok(Some((
             Constraint::Max(dependencies.len().try_into().unwrap()),
             Paragraph::new(dependencies)
-            .block(Block::default().title("Dependencies").borders(Borders::ALL))
-            .wrap(Wrap { trim: false }),
+                .block(Block::default().title("Dependencies").borders(Borders::ALL))
+                .wrap(Wrap { trim: false }),
         )))
     } else {
         Ok(None)
@@ -411,6 +474,7 @@ pub fn render<T: ratatui::backend::Backend>(
         for render_field in [
             render_name_version,
             render_distribution,
+            render_time,
             render_license_copyright,
             render_summary,
             render_urls,

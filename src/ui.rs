@@ -7,8 +7,8 @@ pub mod text;
 /// Determine an appropriate icon for the url type
 /// pypi.org implements icons for some url types
 /// https://github.com/pypi/warehouse/blob/main/warehouse/templates/packaging/detail.html#L20
-fn iconify_url(url: &str) -> String {
-    match url.to_ascii_lowercase().as_str() {
+fn iconify_url(url: (&String, &String)) -> String {
+    match url.0.to_ascii_lowercase().as_str() {
         "package index" => "📦".to_string(),
         "download" => "⇩".to_string(),
         "home" | "homepage" | "home page" => "🏠".to_string(),
