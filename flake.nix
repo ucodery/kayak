@@ -30,12 +30,13 @@
     {
       overlays.default = final: prev: {
         # The Rust toolchain used for the package build
-        rustToolchain = final.rust-bin.stable.latest.default;
+        rustToolchain = final.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       };
 
       devShells = forAllSystems ({ pkgs }: {
         default = pkgs.mkShell {
           packages = with pkgs; [
+            cargo-dist
             rustToolchain
           ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin (
             with pkgs.darwin.apple_sdk; [
