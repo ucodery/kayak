@@ -27,24 +27,20 @@ fn render_name_versions<'a>(
                 Line::from(Span::styled(
                     package.name.to_string(),
                     Style::new().bold().reversed(),
-                )),
-                Line::from(Span::styled(
+                )).centered(),
+                Line::from(
                     versions.join(", "),
-                    Style::new().bold().reversed(),
-                )),
+                ),
             ])
-            .wrap(Wrap { trim: false })
-            .centered(),
+            .wrap(Wrap { trim: false }),
         )))
     } else {
         Ok(Some((
             Constraint::Min(1),
-            Paragraph::new(Line::from(Span::styled(
+            Paragraph::new(Line::from(
                 versions.join(", "),
-                Style::new().bold().reversed(),
-            )))
-            .wrap(Wrap { trim: false })
-            .centered(),
+            ))
+            .wrap(Wrap { trim: false }),
         )))
     }
 }
