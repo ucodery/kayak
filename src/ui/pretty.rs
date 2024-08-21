@@ -1,6 +1,7 @@
 use crate::ui::*;
-use crate::warehouse::{DistributionUrl, Error, PackageVersion};
+use crate::warehouse::{DistributionUrl, PackageVersion};
 use crate::{DisplayFields, Project};
+use anyhow::{Error, Result};
 use chrono::{DateTime, Utc};
 use ratatui::layout::*;
 use ratatui::prelude::*;
@@ -11,7 +12,7 @@ use std::iter;
 fn render_name_versions<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     let package = project.package()?;
     let mut versions = package
         .ordered_versions()
@@ -27,20 +28,16 @@ fn render_name_versions<'a>(
                 Line::from(Span::styled(
                     package.name.to_string(),
                     Style::new().bold().reversed(),
-                )).centered(),
-                Line::from(
-                    versions.join(", "),
-                ),
+                ))
+                .centered(),
+                Line::from(versions.join(", ")),
             ])
             .wrap(Wrap { trim: false }),
         )))
     } else {
         Ok(Some((
             Constraint::Min(1),
-            Paragraph::new(Line::from(
-                versions.join(", "),
-            ))
-            .wrap(Wrap { trim: false }),
+            Paragraph::new(Line::from(versions.join(", "))).wrap(Wrap { trim: false }),
         )))
     }
 }
@@ -48,7 +45,7 @@ fn render_name_versions<'a>(
 fn render_name_version<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.name {
         return Ok(None);
     }
@@ -78,7 +75,7 @@ fn render_name_version<'a>(
 fn render_distribution<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.name || !project.distribution_was_selected() {
         Ok(None)
     } else {
@@ -101,7 +98,7 @@ fn render_distribution<'a>(
 fn render_time<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.time {
         Ok(None)
     } else if project.distribution_was_selected() {
@@ -140,7 +137,7 @@ fn render_time<'a>(
 fn render_license_copyright<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.license {
         return Ok(None);
     }
@@ -176,7 +173,7 @@ fn render_license_copyright<'a>(
 fn render_summary<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.summary {
         Ok(None)
     } else {
@@ -194,7 +191,7 @@ fn render_summary<'a>(
 fn render_urls<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.urls {
         return Ok(None);
     }
@@ -224,7 +221,7 @@ fn render_urls<'a>(
 fn render_keywords<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.keywords {
         return Ok(None);
     }
@@ -243,7 +240,7 @@ fn render_keywords<'a>(
 fn render_classifiers<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.classifiers {
         return Ok(None);
     }
@@ -268,7 +265,7 @@ fn render_classifiers<'a>(
 fn render_artifacts<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if display_fields.artifacts == 0 {
         return Ok(None);
     }
@@ -346,7 +343,7 @@ fn render_artifacts<'a>(
 fn render_dependencies<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.dependencies {
         return Ok(None);
     }
@@ -380,7 +377,7 @@ fn render_dependencies<'a>(
 fn render_packages<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.packages {
         return Ok(None);
     }
@@ -409,7 +406,7 @@ fn render_packages<'a>(
 fn render_executables<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.executables {
         return Ok(None);
     }
@@ -440,7 +437,7 @@ fn render_readme<'a>(
     // TODO: cannot render md within ratatui as escape codes don't work
     display_fields: &DisplayFields,
     project: &mut Project,
-) -> Result<Option<(Constraint, Paragraph<'a>)>, Error> {
+) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if display_fields.readme == 0 {
         return Ok(None);
     }
@@ -453,19 +450,50 @@ fn render_readme<'a>(
     Ok(None)
 }
 
+fn render_recoverable_error<T: ratatui::backend::Backend>(
+    terminal: &mut Terminal<T>,
+    error: Error,
+) -> Result<()> {
+    terminal.draw(|frame| {
+        frame.render_widget(
+            Paragraph::new(error.to_string())
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Color::Red),
+                ),
+            Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Max(4)])
+                .flex(Flex::Center)
+                .horizontal_margin(4)
+                .areas::<1>(frame.size())[0],
+        );
+    })?;
+    return Ok(());
+}
+
 pub fn render<T: ratatui::backend::Backend>(
     terminal: &mut Terminal<T>,
     project: &mut Project,
     display_fields: &DisplayFields,
-) -> Result<(), Error> {
+) -> Result<()> {
     let mut constraints = Vec::new();
     let mut components = Vec::new();
 
     if display_fields.versions {
-        if let Some((constraint, component)) = render_name_versions(display_fields, project)? {
-            constraints.push(constraint);
-            components.push(component);
-        }
+        match render_name_versions(display_fields, project) {
+            Ok(Some((constraint, component))) => {
+                constraints.push(constraint);
+                components.push(component);
+            }
+            Ok(None) => (),
+            Err(error) => {
+                render_recoverable_error(terminal, error)?;
+                return Ok(());
+            }
+        };
     } else {
         for render_field in [
             render_name_version,
@@ -482,10 +510,17 @@ pub fn render<T: ratatui::backend::Backend>(
             render_executables,
             render_readme,
         ] {
-            if let Some((constraint, component)) = render_field(display_fields, project)? {
-                constraints.push(constraint);
-                components.push(component);
-            }
+            match render_field(display_fields, project) {
+                Ok(Some((constraint, component))) => {
+                    constraints.push(constraint);
+                    components.push(component);
+                }
+                Ok(None) => (),
+                Err(error) => {
+                    render_recoverable_error(terminal, error)?;
+                    return Ok(());
+                }
+            };
         }
     }
 
@@ -501,7 +536,7 @@ pub fn render<T: ratatui::backend::Backend>(
     Ok(())
 }
 
-pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<(), Error> {
+pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<()> {
     let backend = CrosstermBackend::new(stdout());
     let options = TerminalOptions {
         viewport: Viewport::Inline(backend.size()?.height),

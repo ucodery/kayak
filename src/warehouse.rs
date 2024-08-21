@@ -2,8 +2,11 @@
 //! specifically encodes metadata
 // Look at warehouse's _json_data for the practical implementation
 use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::error::Error as ErrorTrait;
+use std::fmt;
 use std::str::FromStr;
 
+use anyhow::Result as aResult;
 use pep440::Version;
 use serde::de::IgnoredAny;
 use serde::{Deserialize, Deserializer};
@@ -24,35 +27,17 @@ pub enum Error {
     InvalidVersion,
 }
 
-impl From<ureq::Error> for Error {
-    fn from(_err: ureq::Error) -> Error {
-        Error::NotFound
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::NotFound => write!(f, "NotFound"),
+            Error::InvalidName => write!(f, "InvalidName"),
+            Error::InvalidVersion => write!(f, "InvalidVersion"),
+        }
     }
 }
 
-impl From<std::io::Error> for Error {
-    fn from(_err: std::io::Error) -> Error {
-        Error::NotFound
-    }
-}
-
-impl From<url::ParseError> for Error {
-    fn from(_err: url::ParseError) -> Error {
-        Error::NotFound
-    }
-}
-
-impl From<distribution::Error> for Error {
-    fn from(_err: distribution::Error) -> Error {
-        Error::InvalidName
-    }
-}
-
-impl From<mime::FromStrError> for Error {
-    fn from(_err: mime::FromStrError) -> Error {
-        Error::InvalidName
-    }
-}
+impl ErrorTrait for Error {}
 
 /// The response from a Package Index root URL
 #[derive(Debug)]
@@ -62,17 +47,17 @@ struct IndexRoot {
 }
 
 impl IndexRoot {
-    fn fetch(index: &str) -> Result<Self, Error> {
+    fn fetch(index: &str) -> aResult<Self> {
         let index = Url::parse(index)?;
         if index.cannot_be_a_base() {
-            return Err(Error::NotFound);
+            return Err(Error::NotFound)?;
         }
         let response: IndexRoot = ureq::get(index.as_str()).call()?.into_json()?;
         Ok(response)
     }
 }
 
-pub fn fetch_index_version(index: &str) -> Result<String, Error> {
+pub fn fetch_index_version(index: &str) -> aResult<String> {
     let metadata = IndexRoot::fetch(index)?;
     Ok(metadata.api_version)
 }
@@ -86,7 +71,7 @@ pub enum SupportLevel {
     Unsupported,
 }
 
-pub fn index_is_supported(index: &str) -> Result<SupportLevel, Error> {
+pub fn index_is_supported(index: &str) -> aResult<SupportLevel> {
     let api_version = fetch_index_version(index)?;
     let mut version_parts = api_version.split('.');
     let major = if let Ok(v) = version_parts
@@ -96,7 +81,7 @@ pub fn index_is_supported(index: &str) -> Result<SupportLevel, Error> {
     {
         v
     } else {
-        return Err(Error::InvalidVersion);
+        return Err(Error::InvalidVersion)?;
     };
     let minor = if let Ok(v) = version_parts
         .next()
@@ -105,10 +90,10 @@ pub fn index_is_supported(index: &str) -> Result<SupportLevel, Error> {
     {
         v
     } else {
-        return Err(Error::InvalidVersion);
+        return Err(Error::InvalidVersion)?;
     };
     if version_parts.next().is_some() {
-        return Err(Error::InvalidVersion);
+        return Err(Error::InvalidVersion)?;
     }
     if major > MAJOR_API_VERSION {
         Ok(SupportLevel::Unsupported)
@@ -121,7 +106,7 @@ pub fn index_is_supported(index: &str) -> Result<SupportLevel, Error> {
 
 /// Retrieve the names of all projects hosted on this index
 /// Names may or may not be normalized
-pub fn fetch_projects(index: &str) -> Result<HashSet<String>, Error> {
+pub fn fetch_projects(index: &str) -> aResult<HashSet<String>> {
     let metadata = IndexRoot::fetch(index)?;
     Ok(metadata.projects.into_iter().collect())
 }
@@ -186,10 +171,10 @@ pub struct Package {
 
 impl Package {
     /// Retrieve package metadata from the package index
-    pub fn fetch(index: &str, package: &str) -> Result<Self, Error> {
+    pub fn fetch(index: &str, package: &str) -> aResult<Self> {
         let mut index = Url::parse(index)?;
         if index.cannot_be_a_base() {
-            return Err(Error::NotFound);
+            return Err(Error::NotFound)?;
         }
         let package = distribution::normalize_package_name(package)?;
         index.set_path(&format!("pypi/{package}/json"));
@@ -354,10 +339,10 @@ pub struct PackageVersion {
 
 impl PackageVersion {
     /// Retrieve package version metadata from the package index
-    pub fn fetch(index: &str, package: &str, version: &str) -> Result<Self, Error> {
+    pub fn fetch(index: &str, package: &str, version: &str) -> aResult<Self> {
         let mut index = Url::parse(index)?;
         if index.cannot_be_a_base() {
-            return Err(Error::NotFound);
+            return Err(Error::NotFound)?;
         }
         let package = distribution::normalize_package_name(package)?;
         let version = Version::parse(version)
@@ -396,11 +381,11 @@ impl PackageVersion {
         }
     }
 
-    pub fn version(&self) -> Result<Version, Error> {
-        Version::parse(&self.version).ok_or(Error::InvalidVersion)
+    pub fn version(&self) -> aResult<Version> {
+        Version::parse(&self.version).ok_or(Error::InvalidVersion.into())
     }
 
-    pub fn description_content_type(&self) -> Option<Result<mime::Mime, Error>> {
+    pub fn description_content_type(&self) -> Option<aResult<mime::Mime>> {
         self.description_content_type
             .as_ref()
             .map(|content_type| content_type.parse().map_err(Into::into))
@@ -500,7 +485,7 @@ pub struct DistributionUrl {
 }
 
 impl DistributionUrl {
-    pub fn filename(&self) -> Result<distribution::WheelName, Error> {
+    pub fn filename(&self) -> aResult<distribution::WheelName> {
         Ok(distribution::WheelName::from_filename(&self.filename)?)
     }
 }

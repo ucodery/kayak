@@ -1,7 +1,8 @@
 use crate::package_inspect;
 use crate::ui::*;
-use crate::warehouse::{DistributionUrl, Error, PackageVersion};
+use crate::warehouse::{DistributionUrl, PackageVersion};
 use crate::{DisplayFields, Project};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use std::iter;
 use termimad::*;
@@ -195,7 +196,7 @@ fn format_executables(distribution: &DistributionUrl) -> Vec<String> {
 fn format_package_version_details(
     mut project: Project,
     display_fields: DisplayFields,
-) -> Result<String, Error> {
+) -> Result<String> {
     let mut display = Vec::new();
 
     if display_fields.name {
@@ -261,10 +262,7 @@ fn format_package_version_details(
     Ok(display.join("\n"))
 }
 
-fn format_package_versions(
-    mut project: Project,
-    display_fields: DisplayFields,
-) -> Result<String, Error> {
+fn format_package_versions(mut project: Project, display_fields: DisplayFields) -> Result<String> {
     let package = project.package()?;
     let name = if display_fields.name {
         format!("{}\n", &package.name)
@@ -280,7 +278,7 @@ fn format_package_versions(
     Ok(format!("{name}{}", versions.join(", ")))
 }
 
-pub fn display(project: Project, display_fields: DisplayFields) -> Result<(), Error> {
+pub fn display(project: Project, display_fields: DisplayFields) -> Result<()> {
     if display_fields.versions {
         println!("{}", format_package_versions(project, display_fields)?);
     } else {

@@ -2,6 +2,8 @@ use crate::distribution;
 use crate::package_inspect;
 use crate::warehouse;
 
+use anyhow::Result;
+
 use std::cmp::Ordering;
 
 // lazy loader for project metadata types
@@ -40,7 +42,7 @@ impl Project {
         self.distribution_selector.is_some()
     }
 
-    pub fn package(&mut self) -> Result<&warehouse::Package, warehouse::Error> {
+    pub fn package(&mut self) -> Result<&warehouse::Package> {
         if self.package.is_none() {
             self.package = Some(warehouse::Package::fetch(
                 warehouse::PYPI_URI,
@@ -50,7 +52,7 @@ impl Project {
         Ok(self.package.as_ref().unwrap())
     }
 
-    pub fn version(&mut self) -> Result<&warehouse::PackageVersion, warehouse::Error> {
+    pub fn version(&mut self) -> Result<&warehouse::PackageVersion> {
         if self.version.is_none() {
             self.version = if let Some(version) = &self.version_selector {
                 Some(warehouse::PackageVersion::fetch(
@@ -80,7 +82,7 @@ impl Project {
         Ok(self.version.as_ref().unwrap())
     }
 
-    pub fn distribution(&mut self) -> Result<&warehouse::DistributionUrl, warehouse::Error> {
+    pub fn distribution(&mut self) -> Result<&warehouse::DistributionUrl> {
         if self.distribution.is_none() {
             self.distribution = if let Some(distribution) = &self.distribution_selector {
                 if distribution == "sdist" {
@@ -95,17 +97,17 @@ impl Project {
         Ok(self.distribution.as_ref().unwrap())
     }
 
-    pub fn import_package(&mut self) -> Result<&package_inspect::Package, warehouse::Error> {
+    pub fn import_package(&mut self) -> Result<&package_inspect::Package> {
         if self.import_package.is_none() {
             if self.distribution_selector == Some("sdist".to_string()) {
                 // cannot extract package from a source distribution
-                return Err(warehouse::Error::InvalidName);
+                return Err(warehouse::Error::InvalidName)?;
             } else if self.distribution()?.packagetype == "sdist" {
                 // select a new distribution
                 self.distribution = None;
                 if self.distribution()?.packagetype == "sdist" {
                     // maybe there are no wheels
-                    return Err(warehouse::Error::InvalidName);
+                    return Err(warehouse::Error::InvalidName)?;
                 }
             }
             self.import_package = Some(package_inspect::fetch(&self.distribution()?.url)?);

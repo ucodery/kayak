@@ -3,6 +3,7 @@
 
 use crate::picker::Project;
 use crate::ui::{interactive, pretty, text};
+use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use pep440::Version;
 
@@ -183,7 +184,7 @@ pub struct DisplayFields {
     pub executables: bool,
 }
 
-fn main() -> Result<(), warehouse::Error> {
+fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // do sanity checks before making network requests

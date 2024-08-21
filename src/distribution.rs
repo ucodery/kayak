@@ -1,15 +1,17 @@
+use std::error::Error as stdError;
 use std::fmt;
 
+use anyhow::Result;
 use pep440::Version;
 use regex::Regex;
 
 /// Normalize the package name
 /// https://packaging.python.org/en/latest/specifications/name-normalization/
 /// An Error is returned if the name is not valid to begin with
-pub fn normalize_package_name(name: &str) -> Result<String, Error> {
+pub fn normalize_package_name(name: &str) -> Result<String> {
     let valid_name = Regex::new(r"^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])$").unwrap();
     if !valid_name.is_match(name) {
-        return Err(Error::InvalidPackageName);
+        return Err(Error::InvalidPackageName)?;
     }
 
     let separators = Regex::new(r"[-_.]+").unwrap();
@@ -22,6 +24,17 @@ pub enum Error {
     InvalidWheelName,
     InvalidPackageName,
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::InvalidWheelName => write!(f, "InvalidWheelName"),
+            Error::InvalidPackageName => write!(f, "InvalidPackageName"),
+        }
+    }
+}
+
+impl stdError for Error {}
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct BuildTag {
@@ -203,14 +216,14 @@ pub struct WheelName {
 
 impl WheelName {
     /// Parse a PEP-427 compliant wheel name
-    pub fn from_filename(filename: &str) -> Result<Self, Error> {
+    pub fn from_filename(filename: &str) -> Result<Self> {
         if !filename.ends_with(".whl") {
-            return Err(Error::InvalidWheelName);
+            return Err(Error::InvalidWheelName)?;
         }
         let name_parts = filename.strip_suffix(".whl").unwrap();
         let compat_and_name: Vec<&str> = name_parts.rsplitn(4, '-').collect();
         if compat_and_name.len() != 4 {
-            return Err(Error::InvalidWheelName);
+            return Err(Error::InvalidWheelName)?;
         }
         let compatibility_tag = CompatibilityTag::from_parts(
             compat_and_name[2],
@@ -220,7 +233,7 @@ impl WheelName {
         .ok_or(Error::InvalidWheelName)?;
         let name_and_maybe_build: Vec<&str> = compat_and_name[3].split('-').collect();
         if name_and_maybe_build.len() < 2 || name_and_maybe_build.len() > 3 {
-            return Err(Error::InvalidWheelName);
+            return Err(Error::InvalidWheelName)?;
         }
         let distribution = name_and_maybe_build[0].to_string();
         let version = Version::parse(name_and_maybe_build[1]).ok_or(Error::InvalidWheelName)?;

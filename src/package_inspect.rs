@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Result};
 use csv;
 use ini;
 use mail_parser;
@@ -6,24 +7,6 @@ use std::io::Read;
 use ureq;
 use url::Url;
 use zip::read::read_zipfile_from_stream;
-
-use super::warehouse::Error;
-
-impl From<csv::Error> for Error {
-    fn from(_err: csv::Error) -> Error {
-        Error::InvalidName
-    }
-}
-impl From<ini::Error> for Error {
-    fn from(_err: ini::Error) -> Error {
-        Error::InvalidName
-    }
-}
-impl From<zip::result::ZipError> for Error {
-    fn from(_err: zip::result::ZipError) -> Error {
-        Error::NotFound
-    }
-}
 
 fn dist_filename(entry: &str) -> Option<&str> {
     if let Some((dir, name)) = entry.split_once('/') {
@@ -65,10 +48,10 @@ fn is_data_dir(entry: &str) -> bool {
     }
 }
 
-pub fn fetch(wheel_url: &str) -> Result<Package, Error> {
+pub fn fetch(wheel_url: &str) -> Result<Package> {
     Url::parse(wheel_url)?;
-    let mut record: Result<Record, Error> = Err(Error::NotFound);
-    let mut metadata: Result<Metadata, Error> = Err(Error::NotFound);
+    let mut record: Result<Record> = Err(anyhow!("no RECORD file found in distribution"));
+    let mut metadata: Result<Metadata> = Err(anyhow!("no METADATA file found in distribution"));
     let mut entry_points: Option<EntryPoints> = None;
     let mut wheel = ureq::get(wheel_url).call()?.into_reader();
     while let Some(zipfile) = read_zipfile_from_stream(&mut wheel)? {
@@ -103,7 +86,7 @@ struct Record {
 }
 
 impl Record {
-    fn from_file<R: Read>(file: R) -> Result<Self, Error> {
+    fn from_file<R: Read>(file: R) -> Result<Self> {
         // build specified by PEP-376
         let mut read = csv::ReaderBuilder::new()
             .delimiter(b',')
@@ -143,23 +126,35 @@ struct Metadata {
 }
 
 impl Metadata {
-    fn from_file<R: Read>(mut file: R) -> Result<Self, Error> {
+    fn from_file<R: Read>(mut file: R) -> Result<Self> {
         let mut buf = Vec::new();
         file.read_to_end(&mut buf)?;
         let mp = mail_parser::MessageParser::default()
             .parse_headers(buf.as_slice())
             .unwrap();
-        let metadata_version = match mp.header("Metadata-Version").ok_or(Error::NotFound)? {
+        let metadata_version = match mp.header("Metadata-Version").ok_or(anyhow!(
+            "METADATA file missing required Metadata-Version key"
+        ))? {
             mail_parser::HeaderValue::Text(mv) => mv.to_string(),
-            _ => return Err(Error::NotFound),
+            _ => {
+                return Err(anyhow!(
+                    "METADATA file missing required Metadata-Version value"
+                ))
+            }
         };
-        let name = match mp.header("Name").ok_or(Error::NotFound)? {
+        let name = match mp
+            .header("Name")
+            .ok_or(anyhow!("METADATA file missing required Name key"))?
+        {
             mail_parser::HeaderValue::Text(n) => n.to_string(),
-            _ => return Err(Error::NotFound),
+            _ => return Err(anyhow!("METADATA file missing required Name value")),
         };
-        let version = match mp.header("Version").ok_or(Error::NotFound)? {
+        let version = match mp
+            .header("Version")
+            .ok_or(anyhow!("METADATA file missing required Version key"))?
+        {
             mail_parser::HeaderValue::Text(v) => v.to_string(),
-            _ => return Err(Error::NotFound),
+            _ => return Err(anyhow!("METADATA file missing required Version value")),
         };
         Ok(Metadata {
             metadata_version,
@@ -213,7 +208,7 @@ struct EntryPoints {
 }
 
 impl EntryPoints {
-    fn from_file<R: Read>(mut file: R) -> Result<Self, Error> {
+    fn from_file<R: Read>(mut file: R) -> Result<Self> {
         let entry_points = ini::Ini::read_from(&mut file)?;
         Ok(EntryPoints {
             group: entry_points
