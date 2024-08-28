@@ -93,7 +93,7 @@ pub fn index_is_supported(index: &str) -> aResult<SupportLevel> {
         return Err(Error::InvalidVersion)?;
     };
     if version_parts.next().is_some() {
-        return Err(Error::InvalidVersion)?;
+        Err(Error::InvalidVersion)?;
     }
     if major > MAJOR_API_VERSION {
         Ok(SupportLevel::Unsupported)
@@ -486,7 +486,7 @@ pub struct DistributionUrl {
 
 impl DistributionUrl {
     pub fn filename(&self) -> aResult<distribution::WheelName> {
-        Ok(distribution::WheelName::from_filename(&self.filename)?)
+        distribution::WheelName::from_filename(&self.filename)
     }
 }
 

@@ -11,7 +11,7 @@ use regex::Regex;
 pub fn normalize_package_name(name: &str) -> Result<String> {
     let valid_name = Regex::new(r"^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])$").unwrap();
     if !valid_name.is_match(name) {
-        return Err(Error::InvalidPackageName)?;
+        Err(Error::InvalidPackageName)?;
     }
 
     let separators = Regex::new(r"[-_.]+").unwrap();

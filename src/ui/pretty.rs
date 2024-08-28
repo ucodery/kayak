@@ -453,11 +453,7 @@ fn render_readme<'a>(
     Ok(None)
 }
 
-fn render_recoverable_error(
-    frame: &mut Frame,
-    area: Rect,
-    error: Error,
-) -> () {
+fn render_recoverable_error(frame: &mut Frame, area: Rect, error: Error) {
     frame.render_widget(
         Paragraph::new(error.to_string())
             .alignment(Alignment::Center)
@@ -469,18 +465,22 @@ fn render_recoverable_error(
         // error pop-up goes "below the fold"
         Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Max(4), Constraint::Fill(1)])
+            .constraints([
+                Constraint::Percentage(50),
+                Constraint::Max(4),
+                Constraint::Fill(1),
+            ])
             .horizontal_margin(4)
             .split(area)[1],
     );
 }
 
 pub fn render(
-    mut frame: &mut Frame,
+    frame: &mut Frame,
     area: Rect,
     project: &mut Project,
     display_fields: &DisplayFields,
-) -> () {
+) {
     let mut constraints = Vec::new();
     let mut components = Vec::new();
 
@@ -492,7 +492,7 @@ pub fn render(
             }
             Ok(None) => (),
             Err(error) => {
-                render_recoverable_error(&mut frame, area, error);
+                render_recoverable_error(frame, area, error);
             }
         };
     } else {
@@ -518,7 +518,7 @@ pub fn render(
                 }
                 Ok(None) => (),
                 Err(error) => {
-                    render_recoverable_error(&mut frame, area, error);
+                    render_recoverable_error(frame, area, error);
                 }
             };
         }
@@ -539,8 +539,8 @@ pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<()
     };
     let mut terminal = Terminal::with_options(backend, options)?;
     terminal.draw(|frame| {
-        render(frame, frame.size(), &mut project, &display_fields);
-    });
+        render(frame, frame.area(), &mut project, &display_fields);
+    })?;
     println!();
     Ok(())
 }
