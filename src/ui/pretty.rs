@@ -6,6 +6,8 @@ use chrono::{DateTime, Utc};
 use ratatui::layout::*;
 use ratatui::prelude::*;
 use ratatui::widgets::*;
+use ratatui::TerminalOptions;
+use ratatui::Viewport;
 use std::io::stdout;
 use std::iter;
 
@@ -381,13 +383,14 @@ fn render_packages<'a>(
     if !display_fields.packages {
         return Ok(None);
     }
-    let packages = project
+    let mut packages = project
         .import_package()?
         .provides_packages()
         .iter()
         .map(|p| p.to_string())
         .collect::<Vec<_>>();
     if !packages.is_empty() {
+        packages.sort_unstable();
         Ok(Some((
             Constraint::Length(3),
             Paragraph::new(Line::from(packages.join(", ")))
@@ -450,35 +453,34 @@ fn render_readme<'a>(
     Ok(None)
 }
 
-fn render_recoverable_error<T: ratatui::backend::Backend>(
-    terminal: &mut Terminal<T>,
+fn render_recoverable_error(
+    frame: &mut Frame,
+    area: Rect,
     error: Error,
-) -> Result<()> {
-    terminal.draw(|frame| {
-        frame.render_widget(
-            Paragraph::new(error.to_string())
-                .alignment(Alignment::Center)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Color::Red),
-                ),
-            Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([Constraint::Max(4)])
-                .flex(Flex::Center)
-                .horizontal_margin(4)
-                .areas::<1>(frame.size())[0],
-        );
-    })?;
-    return Ok(());
+) -> () {
+    frame.render_widget(
+        Paragraph::new(error.to_string())
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Color::Red),
+            ),
+        // error pop-up goes "below the fold"
+        Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Percentage(50), Constraint::Max(4), Constraint::Fill(1)])
+            .horizontal_margin(4)
+            .split(area)[1],
+    );
 }
 
-pub fn render<T: ratatui::backend::Backend>(
-    terminal: &mut Terminal<T>,
+pub fn render(
+    mut frame: &mut Frame,
+    area: Rect,
     project: &mut Project,
     display_fields: &DisplayFields,
-) -> Result<()> {
+) -> () {
     let mut constraints = Vec::new();
     let mut components = Vec::new();
 
@@ -490,8 +492,7 @@ pub fn render<T: ratatui::backend::Backend>(
             }
             Ok(None) => (),
             Err(error) => {
-                render_recoverable_error(terminal, error)?;
-                return Ok(());
+                render_recoverable_error(&mut frame, area, error);
             }
         };
     } else {
@@ -517,23 +518,18 @@ pub fn render<T: ratatui::backend::Backend>(
                 }
                 Ok(None) => (),
                 Err(error) => {
-                    render_recoverable_error(terminal, error)?;
-                    return Ok(());
+                    render_recoverable_error(&mut frame, area, error);
                 }
             };
         }
     }
 
-    terminal.draw(|frame| {
-        let page = Layout::new(Direction::Vertical, constraints)
-            .flex(Flex::Start)
-            .split(frame.size());
-        for (p, component) in components.iter().enumerate() {
-            frame.render_widget(component, page[p]);
-        }
-    })?;
-
-    Ok(())
+    let page = Layout::new(Direction::Vertical, constraints)
+        .flex(Flex::Start)
+        .split(area);
+    for (p, component) in components.iter().enumerate() {
+        frame.render_widget(component, page[p]);
+    }
 }
 
 pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<()> {
@@ -542,7 +538,9 @@ pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<()
         viewport: Viewport::Inline(backend.size()?.height),
     };
     let mut terminal = Terminal::with_options(backend, options)?;
-    render(&mut terminal, &mut project, &display_fields)?;
+    terminal.draw(|frame| {
+        render(frame, frame.size(), &mut project, &display_fields);
+    });
     println!();
     Ok(())
 }
