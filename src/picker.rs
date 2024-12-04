@@ -94,7 +94,7 @@ impl Project {
                 self.pick_best_bdist()
             }
         }
-        Ok(self.distribution.as_ref().unwrap())
+        self.distribution.as_ref().ok_or(distribution::Error::InvalidWheelName.into())
     }
 
     pub fn import_package(&mut self) -> Result<&package_inspect::Package> {
