@@ -12,6 +12,70 @@ use ratatui::widgets::*;
 use std::io::stdout;
 use std::iter;
 
+fn encode_cli(project: &Project, display_fields: &DisplayFields) -> String {
+    let mut cli = String::from("kayak");
+    if display_fields.versions {
+        cli.push_str(" versions");
+        if !display_fields.name {
+            cli.push_str(" -qq");
+        }
+    } else {
+        cli.push_str(" ");
+        cli.push_str(&project.package_selector());
+        if let Some(version) = project.version_selector() {
+            cli.push_str(" ");
+            cli.push_str(&version);
+        }
+        if let Some(dist) = project.distribution_selector() {
+            cli.push_str(" ");
+            cli.push_str(&dist);
+        }
+        if !display_fields.name {
+            cli.push_str(" -qq")
+        }
+        if !display_fields.time && project.distribution_selector().is_some() {
+            cli.push_str(" -q")
+        }
+        if display_fields.summary {
+            cli.push_str(" --summary")
+        }
+        if display_fields.license {
+            cli.push_str(" --license")
+        }
+        if display_fields.urls {
+            cli.push_str(" --urls")
+        }
+        if display_fields.keywords {
+            cli.push_str(" --keywords")
+        }
+        if display_fields.classifiers {
+            cli.push_str(" --classifiers")
+        }
+        match display_fields.artifacts {
+            0 => (),
+            1 => cli.push_str(" --artifacts"),
+            _ => cli
+                .push_str(&format!(" -{}", "a".repeat(display_fields.artifacts.into())))
+        }
+        if display_fields.dependencies {
+            cli.push_str(" --dependencies")
+        }
+        match display_fields.readme {
+            0 => (),
+            1 => cli.push_str(" --readme"),
+            _ => cli
+                .push_str(&format!(" -{}", "r".repeat(display_fields.readme.into())))
+        }
+        if display_fields.packages {
+            cli.push_str(" --packages")
+        }
+        if display_fields.executables {
+            cli.push_str(" --executables")
+        }
+    }
+    cli
+}
+
 fn render_menu(frame: &mut Frame, area: Rect) {
     // anchor the quit and help commands, so they are always visable
     let [controls_area, help_area, quit_area] = Layout::default()
@@ -147,6 +211,18 @@ fn render_interactive_help(frame: &mut Frame, area: Rect) {
             String::from("on: e off: E"),
             String::from("display the project's executable file names"),
         ],
+        // session commands
+        // TODO: CTRL-C
+        // TODO: ?
+        [
+            String::from("print"),
+            // issue#3 String::from("preview: CTRL-P exit: CTRL-SHIFT-P"),
+            String::from("CTRL-p"),
+            String::from("display the `kayak` command that will recreate the currently displayed project information. \
+                         the `--format` is explicitly left out"),
+                         // issue#3 previewing the print will maintain the current interactive session, while exiting will clear \
+                         // issue#3 the screen and show only the command. \
+        ],
     ];
 
     let controls_areas = Layout::default()
@@ -171,16 +247,16 @@ fn render_interactive_help(frame: &mut Frame, area: Rect) {
     }
 }
 
-fn render_interactive_help_menu(frame: &mut Frame, area: Rect) {
+fn render_no_commands_menu(frame: &mut Frame, area: Rect) {
     frame.render_widget(
-        Paragraph::new(String::from("PRESS ANY KEY TO EXIT"))
+        Paragraph::new(String::from("PRESS ANY KEY TO CLOSE"))
             .alignment(Alignment::Center)
             .block(Block::default().borders(Borders::LEFT | Borders::TOP | Borders::RIGHT)),
         area,
     );
 }
 
-fn render_new_project_prompt(frame: &mut Frame, area: Rect, current_input: String) {
+fn render_info_popup(frame: &mut Frame, area: Rect, current_input: String) {
     // input pop-up goes "above the fold"
     let prompt_area = Layout::default()
         .direction(Direction::Vertical)
@@ -235,7 +311,9 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
     let mut display_fields = display_fields;
     let mut displaying_help = false;
     let mut gathering_user_input = false;
+    let mut displaying_info = false;
     let mut user_input = String::new();
+    let mut info_message = String::new();
 
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
@@ -251,12 +329,16 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                 .areas::<2>(frame.area());
             if displaying_help {
                 render_interactive_help(frame, display);
-                render_interactive_help_menu(frame, dock);
+                render_no_commands_menu(frame, dock);
             } else {
                 render(frame, display, &mut project, &display_fields);
+                // floating boxes are rendered after the main display
                 if gathering_user_input {
-                    render_new_project_prompt(frame, display, user_input.clone());
+                    render_info_popup(frame, display, user_input.clone());
                     render_new_project_prompt_menu(frame, dock);
+                } else if displaying_info {
+                    render_info_popup(frame, display, info_message.clone());
+                    render_no_commands_menu(frame, dock);
                 } else {
                     render_menu(frame, dock);
                 }
@@ -273,6 +355,9 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                     }
                     if displaying_help {
                         displaying_help = false;
+                    } else if displaying_info {
+                        displaying_info = false;
+                        info_message.clear();
                     } else if gathering_user_input {
                         match key.code {
                             KeyCode::Char(key_char) => {
@@ -383,10 +468,19 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                                 }
                             }
                             KeyCode::Char('p') => {
-                                display_fields.packages = true;
+                                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                                    info_message = encode_cli(&project, &display_fields);
+                                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                                        break;
+                                    } else {
+                                        displaying_info = true;
+                                    }
+                                } else {
+                                    display_fields.packages = true;
+                                };
                             }
                             KeyCode::Char('P') => {
-                                display_fields.packages = false;
+                                    display_fields.packages = false;
                             }
                             KeyCode::Char('e') => {
                                 display_fields.executables = true;
@@ -403,5 +497,6 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
     }
     stdout().execute(LeaveAlternateScreen)?;
     disable_raw_mode()?;
+    println!("{info_message}");
     Ok(())
 }

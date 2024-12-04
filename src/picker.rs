@@ -199,4 +199,16 @@ impl Project {
             .to_owned()
             .cloned()
     }
+
+    pub fn package_selector(&self) -> String {
+        self.package_selector.clone()
+    }
+
+    pub fn version_selector(&self) -> Option<String> {
+        self.version_selector.clone()
+    }
+
+    pub fn distribution_selector(&self) -> Option<String> {
+        self.distribution_selector.clone()
+    }
 }
