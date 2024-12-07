@@ -15,62 +15,66 @@ use std::iter;
 fn encode_cli(project: &Project, display_fields: &DisplayFields) -> String {
     let mut cli = String::from("kayak");
     if display_fields.versions {
-        cli.push_str(" versions");
+        cli += " versions";
         if !display_fields.name {
-            cli.push_str(" -qq");
+            cli += " -qq";
         }
     } else {
-        cli.push_str(" ");
-        cli.push_str(&project.package_selector());
+        cli += " ";
+        cli += &project.package_selector();
         if let Some(version) = project.version_selector() {
-            cli.push_str(" ");
-            cli.push_str(&version);
+            cli += " ";
+            cli += &version;
         }
         if let Some(dist) = project.distribution_selector() {
-            cli.push_str(" ");
-            cli.push_str(&dist);
+            cli += " ";
+            cli += &dist;
         }
         if !display_fields.name {
-            cli.push_str(" -qq")
+            cli += " -qq";
         }
         if !display_fields.time && project.distribution_selector().is_some() {
-            cli.push_str(" -q")
+            cli += " -q";
         }
         if display_fields.summary {
-            cli.push_str(" --summary")
+            cli += " --summary";
         }
         if display_fields.license {
-            cli.push_str(" --license")
+            cli += " --license";
         }
         if display_fields.urls {
-            cli.push_str(" --urls")
+            cli += " --urls";
         }
         if display_fields.keywords {
-            cli.push_str(" --keywords")
+            cli += " --keywords";
         }
         if display_fields.classifiers {
-            cli.push_str(" --classifiers")
+            cli += " --classifiers";
         }
         match display_fields.artifacts {
             0 => (),
-            1 => cli.push_str(" --artifacts"),
-            _ => cli
-                .push_str(&format!(" -{}", "a".repeat(display_fields.artifacts.into())))
+            1 => cli += " --artifacts",
+            _ => {
+                cli += " -";
+                cli += &"a".repeat(display_fields.artifacts.into());
+            }
         }
         if display_fields.dependencies {
-            cli.push_str(" --dependencies")
+            cli += " --dependencies";
         }
         match display_fields.readme {
             0 => (),
-            1 => cli.push_str(" --readme"),
-            _ => cli
-                .push_str(&format!(" -{}", "r".repeat(display_fields.readme.into())))
+            1 => cli += " --readme",
+            _ => {
+                cli += " -";
+                cli += &"r".repeat(display_fields.readme.into());
+            }
         }
         if display_fields.packages {
-            cli.push_str(" --packages")
+            cli += " --packages";
         }
         if display_fields.executables {
-            cli.push_str(" --executables")
+            cli += " --executables";
         }
     }
     cli
@@ -306,14 +310,17 @@ fn render_new_project_prompt_menu(frame: &mut Frame, area: Rect) {
     frame.render_widget(quit_content, quit_area);
 }
 
+enum DisplayMode {
+    Help,
+    Info(String),
+    Input(String),
+    Normal,
+}
+
 pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
     let mut project = project;
     let mut display_fields = display_fields;
-    let mut displaying_help = false;
-    let mut gathering_user_input = false;
-    let mut displaying_info = false;
-    let mut user_input = String::new();
-    let mut info_message = String::new();
+    let mut mode = DisplayMode::Normal;
 
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
@@ -327,21 +334,28 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                 .direction(Direction::Vertical)
                 .constraints([Constraint::Fill(1), Constraint::Max(2)])
                 .areas::<2>(frame.area());
-            if displaying_help {
-                render_interactive_help(frame, display);
-                render_no_commands_menu(frame, dock);
-            } else {
-                render(frame, display, &mut project, &display_fields);
-                // floating boxes are rendered after the main display
-                if gathering_user_input {
-                    render_info_popup(frame, display, user_input.clone());
-                    render_new_project_prompt_menu(frame, dock);
-                } else if displaying_info {
+
+            match &mode {
+                DisplayMode::Help => {
+                    render_interactive_help(frame, display);
+                    render_no_commands_menu(frame, dock);
+                },
+                DisplayMode::Info(info_message) => {
+                    // floating boxes are rendered over the main display; if render is not called, the main display will disappear
+                    render(frame, display, &mut project, &display_fields);
                     render_info_popup(frame, display, info_message.clone());
                     render_no_commands_menu(frame, dock);
-                } else {
+                },
+                DisplayMode::Input(user_input) => {
+                    // floating boxes are rendered over the main display; if render is not called, the main display will disappear
+                    render(frame, display, &mut project, &display_fields);
+                    render_info_popup(frame, display, user_input.clone());
+                    render_new_project_prompt_menu(frame, dock);
+                },
+                DisplayMode::Normal => {
+                    render(frame, display, &mut project, &display_fields);
                     render_menu(frame, dock);
-                }
+                },
             }
         })?;
         if event::poll(std::time::Duration::from_millis(16))? {
@@ -353,142 +367,142 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                             break;
                         }
                     }
-                    if displaying_help {
-                        displaying_help = false;
-                    } else if displaying_info {
-                        displaying_info = false;
-                        info_message.clear();
-                    } else if gathering_user_input {
-                        match key.code {
-                            KeyCode::Char(key_char) => {
-                                user_input.push(key_char);
-                            }
-                            KeyCode::Backspace => {
-                                user_input.pop();
-                            }
-                            KeyCode::Enter => {
-                                let mut requested_project = user_input.split_whitespace();
-                                if let Some(name) = requested_project.next() {
-                                    let version = requested_project.next().map(str::to_string);
-                                    let distribution = requested_project.next().map(str::to_string);
-                                    project = Project::new(name.to_string(), version, distribution);
+                    match &mut mode {
+                        DisplayMode::Help => {
+                            mode = DisplayMode::Normal;
+                        },
+                        DisplayMode::Info(_) => {
+                            mode = DisplayMode::Normal;
+                        },
+                        DisplayMode::Input(user_input) => {
+                            match key.code {
+                                KeyCode::Char(key_char) => {
+                                    user_input.push(key_char);
                                 }
-                                // else no string provided, continue to prompt
-                                user_input.clear();
-                                gathering_user_input = false;
-                            }
-                            KeyCode::Esc => {
-                                gathering_user_input = false;
-                            }
-                            _ => (),
-                        }
-                    } else {
-                        match key.code {
-                            KeyCode::Char('q') => {
-                                break;
-                            }
-                            KeyCode::Char('?') => {
-                                displaying_help = true;
-                            }
-                            KeyCode::Char(' ') => {
-                                gathering_user_input = true;
-                            }
-                            KeyCode::Char('n') => {
-                                display_fields.name = true;
-                            }
-                            KeyCode::Char('N') => {
-                                display_fields.name = false;
-                            }
-                            KeyCode::Char('v') => {
-                                display_fields.versions = true;
-                            }
-                            KeyCode::Char('V') => {
-                                display_fields.versions = false;
-                            }
-                            KeyCode::Char('t') => {
-                                display_fields.time = true;
-                            }
-                            KeyCode::Char('T') => {
-                                display_fields.time = false;
-                            }
-                            KeyCode::Char('s') => {
-                                display_fields.summary = true;
-                            }
-                            KeyCode::Char('S') => {
-                                display_fields.summary = false;
-                            }
-                            KeyCode::Char('l') => {
-                                display_fields.license = true;
-                            }
-                            KeyCode::Char('L') => {
-                                display_fields.license = false;
-                            }
-                            KeyCode::Char('u') => {
-                                display_fields.urls = true;
-                            }
-                            KeyCode::Char('U') => {
-                                display_fields.urls = false;
-                            }
-                            KeyCode::Char('k') => {
-                                display_fields.keywords = true;
-                            }
-                            KeyCode::Char('K') => {
-                                display_fields.keywords = false;
-                            }
-                            KeyCode::Char('c') => {
-                                display_fields.classifiers = true;
-                            }
-                            KeyCode::Char('C') => {
-                                display_fields.classifiers = false;
-                            }
-                            KeyCode::Char('a') => {
-                                if display_fields.artifacts < 4 {
-                                    display_fields.artifacts += 1;
+                                KeyCode::Backspace => {
+                                    user_input.pop();
                                 }
-                            }
-                            KeyCode::Char('A') => {
-                                if display_fields.artifacts > 0 {
-                                    display_fields.artifacts -= 1;
-                                }
-                            }
-                            KeyCode::Char('d') => {
-                                display_fields.dependencies = true;
-                            }
-                            KeyCode::Char('D') => {
-                                display_fields.dependencies = false;
-                            }
-                            KeyCode::Char('r') => {
-                                if display_fields.readme < 2 {
-                                    display_fields.readme += 1;
-                                }
-                            }
-                            KeyCode::Char('R') => {
-                                if display_fields.readme > 0 {
-                                    display_fields.readme -= 1;
-                                }
-                            }
-                            KeyCode::Char('p') => {
-                                if key.modifiers.contains(KeyModifiers::CONTROL) {
-                                    info_message = encode_cli(&project, &display_fields);
-                                    if key.modifiers.contains(KeyModifiers::SHIFT) {
-                                        break;
-                                    } else {
-                                        displaying_info = true;
+                                KeyCode::Enter => {
+                                    let mut requested_project = user_input.split_whitespace();
+                                    if let Some(name) = requested_project.next() {
+                                        let version = requested_project.next().map(str::to_string);
+                                        let distribution = requested_project.next().map(str::to_string);
+                                        project = Project::new(name.to_string(), version, distribution);
                                     }
-                                } else {
-                                    display_fields.packages = true;
-                                };
+                                    mode = DisplayMode::Normal;
+                                }
+                                KeyCode::Esc => {
+                                    mode = DisplayMode::Normal;
+                                }
+                                _ => (),
                             }
-                            KeyCode::Char('P') => {
-                                    display_fields.packages = false;
+                        }
+                        DisplayMode::Normal => {
+                            match key.code {
+                                KeyCode::Char('q') => {
+                                    break;
+                                }
+                                KeyCode::Char('?') => {
+                                    mode = DisplayMode::Help;
+                                }
+                                KeyCode::Char(' ') => {
+                                    mode = DisplayMode::Input(String::new());
+                                }
+                                KeyCode::Char('n') => {
+                                    display_fields.name = true;
+                                }
+                                KeyCode::Char('N') => {
+                                    display_fields.name = false;
+                                }
+                                KeyCode::Char('v') => {
+                                    display_fields.versions = true;
+                                }
+                                KeyCode::Char('V') => {
+                                    display_fields.versions = false;
+                                }
+                                KeyCode::Char('t') => {
+                                    display_fields.time = true;
+                                }
+                                KeyCode::Char('T') => {
+                                    display_fields.time = false;
+                                }
+                                KeyCode::Char('s') => {
+                                    display_fields.summary = true;
+                                }
+                                KeyCode::Char('S') => {
+                                    display_fields.summary = false;
+                                }
+                                KeyCode::Char('l') => {
+                                    display_fields.license = true;
+                                }
+                                KeyCode::Char('L') => {
+                                    display_fields.license = false;
+                                }
+                                KeyCode::Char('u') => {
+                                    display_fields.urls = true;
+                                }
+                                KeyCode::Char('U') => {
+                                    display_fields.urls = false;
+                                }
+                                KeyCode::Char('k') => {
+                                    display_fields.keywords = true;
+                                }
+                                KeyCode::Char('K') => {
+                                    display_fields.keywords = false;
+                                }
+                                KeyCode::Char('c') => {
+                                    display_fields.classifiers = true;
+                                }
+                                KeyCode::Char('C') => {
+                                    display_fields.classifiers = false;
+                                }
+                                KeyCode::Char('a') => {
+                                    if display_fields.artifacts < 4 {
+                                        display_fields.artifacts += 1;
+                                    }
+                                }
+                                KeyCode::Char('A') => {
+                                    if display_fields.artifacts > 0 {
+                                        display_fields.artifacts -= 1;
+                                    }
+                                }
+                                KeyCode::Char('d') => {
+                                    display_fields.dependencies = true;
+                                }
+                                KeyCode::Char('D') => {
+                                    display_fields.dependencies = false;
+                                }
+                                KeyCode::Char('r') => {
+                                    if display_fields.readme < 2 {
+                                        display_fields.readme += 1;
+                                    }
+                                }
+                                KeyCode::Char('R') => {
+                                    if display_fields.readme > 0 {
+                                        display_fields.readme -= 1;
+                                    }
+                                }
+                                KeyCode::Char('p') => {
+                                    if key.modifiers.contains(KeyModifiers::CONTROL) {
+                                        mode = DisplayMode::Info(encode_cli(&project, &display_fields));
+                                        if key.modifiers.contains(KeyModifiers::SHIFT) {
+                                            break;
+                                        }
+                                    } else {
+                                        display_fields.packages = true;
+                                    };
+                                }
+                                KeyCode::Char('P') => {
+                                        display_fields.packages = false;
+                                }
+                                KeyCode::Char('e') => {
+                                    display_fields.executables = true;
+                                }
+                                KeyCode::Char('E') => {
+                                    display_fields.executables = false;
+                                }
+                                _ => (),
                             }
-                            KeyCode::Char('e') => {
-                                display_fields.executables = true;
-                            }
-                            KeyCode::Char('E') => {
-                                display_fields.executables = false;
-                            }
-                            _ => (),
                         }
                     }
                 }
@@ -497,6 +511,5 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
     }
     stdout().execute(LeaveAlternateScreen)?;
     disable_raw_mode()?;
-    println!("{info_message}");
     Ok(())
 }

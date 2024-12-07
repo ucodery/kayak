@@ -96,14 +96,12 @@ impl Record {
         let rec = read
             .records()
             .filter_map(|rec| {
-                let Ok(r) = rec else { return None };
+                let r = rec.ok()?;
                 if r.len() != 3 {
                     return None;
                 };
-                let Ok(size) = r[2].parse() else { return None };
-                let Some((algo, hash)) = r[1].split_once('=') else {
-                    return None;
-                };
+                let size = r[2].parse().ok()?;
+                let (algo, hash) = r[1].split_once('=')?;
                 Some(RecordEntry {
                     entry: r[0].to_string(),
                     algo: algo.to_string(),
