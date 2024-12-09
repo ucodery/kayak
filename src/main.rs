@@ -16,8 +16,16 @@ pub mod warehouse;
 #[derive(Parser, Debug)]
 #[command(version, about)]
 struct Cli {
-    #[arg(long_help = "the name of the python project to look up")]
-    project: String,
+    #[arg(
+        long_help = "the name of the python project to look up",
+        // what I want: required_unless_present_and_eq_all([("format", "interactive")])
+        required_unless_present_all = ["format"],
+        required_if_eq_any = [
+            ("format", "text"),
+            ("format", "pretty"),
+        ]
+    )]
+    project: Option<String>,
     #[arg(
         value_name = "VERSION",
         long_help = "if not specified, the greatest stable version is automatically retrieved"
@@ -227,11 +235,11 @@ fn main() -> Result<()> {
         executables: cli.executables,
     };
 
-    let project = Project::new(cli.project, cli.package_version, cli.dist);
+    let project = cli.project.map(|p| Project::new(p, cli.package_version, cli.dist));
 
     match cli.format {
-        Format::Text => text::display(project, display_fields)?,
-        Format::Pretty => pretty::display(project, display_fields)?,
+        Format::Text => text::display(project.expect("a project is requred to output text"), display_fields)?,
+        Format::Pretty => pretty::display(project.expect("a project is requred to pretty print text"), display_fields)?,
         Format::Interactive => interactive::run(project, display_fields)?,
     };
 

@@ -317,10 +317,14 @@ enum DisplayMode {
     Normal,
 }
 
-pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
+pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()> {
     let mut project = project;
     let mut display_fields = display_fields;
-    let mut mode = DisplayMode::Normal;
+    let mut mode = if project.is_some() {
+        DisplayMode::Normal
+    } else {
+        DisplayMode::Input(String::new())
+    };
 
     stdout().execute(EnterAlternateScreen)?;
     enable_raw_mode()?;
@@ -342,18 +346,23 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                 },
                 DisplayMode::Info(info_message) => {
                     // floating boxes are rendered over the main display; if render is not called, the main display will disappear
-                    render(frame, display, &mut project, &display_fields);
+                    if let Some(prj) = &mut project {
+                        render(frame, display, prj, &display_fields);
+                    }
                     render_info_popup(frame, display, info_message.clone());
                     render_no_commands_menu(frame, dock);
                 },
                 DisplayMode::Input(user_input) => {
                     // floating boxes are rendered over the main display; if render is not called, the main display will disappear
-                    render(frame, display, &mut project, &display_fields);
+                    if let Some(prj) = &mut project {
+                        render(frame, display, prj, &display_fields);
+                    }
                     render_info_popup(frame, display, user_input.clone());
                     render_new_project_prompt_menu(frame, dock);
                 },
                 DisplayMode::Normal => {
-                    render(frame, display, &mut project, &display_fields);
+                    let prj = &mut project.as_mut().expect("only attempt to render project after a selection has been made");
+                    render(frame, display, prj, &display_fields);
                     render_menu(frame, dock);
                 },
             }
@@ -369,10 +378,18 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                     }
                     match &mut mode {
                         DisplayMode::Help => {
-                            mode = DisplayMode::Normal;
+                            mode = if let Some(_) = project {
+                                DisplayMode::Normal
+                            } else {
+                                DisplayMode::Input(String::new())
+                            };
                         },
                         DisplayMode::Info(_) => {
-                            mode = DisplayMode::Normal;
+                            mode = if let Some(_) = project {
+                                DisplayMode::Normal
+                            } else {
+                                DisplayMode::Input(String::new())
+                            };
                         },
                         DisplayMode::Input(user_input) => {
                             match key.code {
@@ -387,12 +404,16 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                                     if let Some(name) = requested_project.next() {
                                         let version = requested_project.next().map(str::to_string);
                                         let distribution = requested_project.next().map(str::to_string);
-                                        project = Project::new(name.to_string(), version, distribution);
+                                        project = Some(Project::new(name.to_string(), version, distribution));
+                                        mode = DisplayMode::Normal;
                                     }
-                                    mode = DisplayMode::Normal;
+                                    // else can't leave input
                                 }
                                 KeyCode::Esc => {
-                                    mode = DisplayMode::Normal;
+                                    if let Some(_) = project {
+                                        mode = DisplayMode::Normal;
+                                    }
+                                    // else can't leave input
                                 }
                                 _ => (),
                             }
@@ -484,13 +505,18 @@ pub fn run(project: Project, display_fields: DisplayFields) -> Result<()> {
                                 }
                                 KeyCode::Char('p') => {
                                     if key.modifiers.contains(KeyModifiers::CONTROL) {
-                                        mode = DisplayMode::Info(encode_cli(&project, &display_fields));
-                                        if key.modifiers.contains(KeyModifiers::SHIFT) {
-                                            break;
+                                        if let Some(prj) = &project {
+                                            mode = DisplayMode::Info(encode_cli(prj, &display_fields));
+                                            if key.modifiers.contains(KeyModifiers::SHIFT) {
+                                                break;
+                                            }
+                                        } else {
+                                            // TODO: should be an error. Error popup should be more generic
+                                            mode = DisplayMode::Info("Please select a project before printing".into());
                                         }
                                     } else {
                                         display_fields.packages = true;
-                                    };
+                                    }
                                 }
                                 KeyCode::Char('P') => {
                                         display_fields.packages = false;
