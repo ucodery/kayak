@@ -1,7 +1,7 @@
 use crate::ui::*;
 use crate::warehouse::{DistributionUrl, PackageVersion};
 use crate::{DisplayFields, Project};
-use anyhow::{Error, Result};
+use anyhow::Result;
 use chrono::{DateTime, Utc};
 use ratatui::layout::*;
 use ratatui::prelude::*;
@@ -453,25 +453,15 @@ fn render_readme<'a>(
     Ok(None)
 }
 
-fn render_recoverable_error(frame: &mut Frame, area: Rect, error: Error) {
+fn render_error(frame: &mut Frame, area: Rect, message: String) {
+    frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(error.to_string())
-            .alignment(Alignment::Center)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Color::Red),
-            ),
-        // error pop-up goes "below the fold"
-        Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(50),
-                Constraint::Max(4),
-                Constraint::Fill(1),
-            ])
-            .horizontal_margin(4)
-            .split(area)[1],
+        Paragraph::new(message).alignment(Alignment::Center).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Color::Red),
+        ),
+        area,
     );
 }
 
@@ -480,7 +470,7 @@ pub fn render(
     area: Rect,
     project: &mut Project,
     display_fields: &DisplayFields,
-) {
+) -> Result<(), String> {
     let mut constraints = Vec::new();
     let mut components = Vec::new();
 
@@ -491,9 +481,7 @@ pub fn render(
                 components.push(component);
             }
             Ok(None) => (),
-            Err(error) => {
-                render_recoverable_error(frame, area, error);
-            }
+            Err(error) => return Err(error.to_string()),
         };
     } else {
         for render_field in [
@@ -517,9 +505,7 @@ pub fn render(
                     components.push(component);
                 }
                 Ok(None) => (),
-                Err(error) => {
-                    render_recoverable_error(frame, area, error);
-                }
+                Err(error) => return Err(error.to_string()),
             };
         }
     }
@@ -530,6 +516,8 @@ pub fn render(
     for (p, component) in components.iter().enumerate() {
         frame.render_widget(component, page[p]);
     }
+
+    Ok(())
 }
 
 pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<()> {
@@ -539,7 +527,14 @@ pub fn display(mut project: Project, display_fields: DisplayFields) -> Result<()
     };
     let mut terminal = Terminal::with_options(backend, options)?;
     terminal.draw(|frame| {
-        render(frame, frame.area(), &mut project, &display_fields);
+        let area = frame.area();
+        match render(frame, area, &mut project, &display_fields) {
+            Ok(()) => (),
+            Err(err) => {
+                let area = Rect::new(4, 0, frame.area().right().saturating_sub(8), 4);
+                render_error(frame, area, err)
+            }
+        }
     })?;
     println!();
     Ok(())

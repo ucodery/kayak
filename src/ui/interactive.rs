@@ -80,6 +80,45 @@ fn encode_cli(project: &Project, display_fields: &DisplayFields) -> String {
     cli
 }
 
+fn render_popup(frame: &mut Frame, area: Rect, message: String, is_error: bool) {
+    // info pop-up goes "above the fold", error pop-up goes "below the fold"
+    let constraints = if is_error {
+        [
+            Constraint::Percentage(50),
+            Constraint::Max(4),
+            Constraint::Fill(1),
+        ]
+    } else {
+        [
+            Constraint::Fill(1),
+            Constraint::Max(4),
+            Constraint::Percentage(50),
+        ]
+    };
+    let block = if is_error {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Color::Red)
+    } else {
+        Block::default()
+            .borders(Borders::ALL)
+            .border_style(Color::Blue)
+    };
+    let area = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(constraints)
+        .horizontal_margin(4)
+        .split(area)[1];
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(message)
+            .alignment(Alignment::Center)
+            .block(block),
+        area,
+    );
+}
+
 fn render_menu(frame: &mut Frame, area: Rect) {
     // anchor the quit and help commands, so they are always visable
     let [controls_area, help_area, quit_area] = Layout::default()
@@ -260,30 +299,6 @@ fn render_no_commands_menu(frame: &mut Frame, area: Rect) {
     );
 }
 
-fn render_info_popup(frame: &mut Frame, area: Rect, current_input: String) {
-    // input pop-up goes "above the fold"
-    let prompt_area = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Fill(1),
-            Constraint::Max(4),
-            Constraint::Percentage(50),
-        ])
-        .horizontal_margin(4)
-        .split(area)[1];
-    frame.render_widget(Clear, prompt_area);
-    frame.render_widget(
-        Paragraph::new(current_input)
-            .alignment(Alignment::Center)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(Color::Blue),
-            ),
-        prompt_area,
-    );
-}
-
 fn render_new_project_prompt_menu(frame: &mut Frame, area: Rect) {
     // anchor the quit and enter commands, so they are always visable
     let [enter_area, usage_area, quit_area] = Layout::default()
@@ -310,20 +325,49 @@ fn render_new_project_prompt_menu(frame: &mut Frame, area: Rect) {
     frame.render_widget(quit_content, quit_area);
 }
 
+fn render_messages(
+    frame: &mut Frame,
+    area: Rect,
+    project: &mut Option<Project>,
+    display_fields: &DisplayFields,
+    messages: &Messages,
+) {
+    // floating boxes are rendered over the main display; if render is not called, the main display will disappear
+    if let Some(prj) = project {
+        // render should have already been tried before trying to render messages, the bigger goal here is to render the popups
+        let _ = render(frame, area, prj, display_fields);
+    }
+    match messages {
+        Messages::Info(msg) => render_popup(frame, area, msg.to_string(), false),
+        Messages::Error(err) => render_popup(frame, area, err.to_string(), true),
+        Messages::InfoError((msg, err)) => {
+            render_popup(frame, area, msg.to_string(), false);
+            render_popup(frame, area, err.to_string(), true);
+        }
+    }
+}
+
+enum Messages {
+    Info(String),
+    Error(String),
+    InfoError((String, String)),
+}
+
 enum DisplayMode {
     Help,
-    Info(String),
-    Input(String),
+    Info(Messages),
+    Input(Messages),
     Normal,
 }
 
 pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()> {
     let mut project = project;
+    let mut last_project: Option<Project> = None;
     let mut display_fields = display_fields;
     let mut mode = if project.is_some() {
         DisplayMode::Normal
     } else {
-        DisplayMode::Input(String::new())
+        DisplayMode::Input(Messages::Info(String::new()))
     };
 
     stdout().execute(EnterAlternateScreen)?;
@@ -343,28 +387,43 @@ pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()
                 DisplayMode::Help => {
                     render_interactive_help(frame, display);
                     render_no_commands_menu(frame, dock);
-                },
-                DisplayMode::Info(info_message) => {
-                    // floating boxes are rendered over the main display; if render is not called, the main display will disappear
-                    if let Some(prj) = &mut project {
-                        render(frame, display, prj, &display_fields);
-                    }
-                    render_info_popup(frame, display, info_message.clone());
+                }
+                DisplayMode::Info(info) => {
+                    render_messages(frame, display, &mut project, &display_fields, info);
                     render_no_commands_menu(frame, dock);
-                },
-                DisplayMode::Input(user_input) => {
-                    // floating boxes are rendered over the main display; if render is not called, the main display will disappear
-                    if let Some(prj) = &mut project {
-                        render(frame, display, prj, &display_fields);
-                    }
-                    render_info_popup(frame, display, user_input.clone());
+                }
+                DisplayMode::Input(input) => {
+                    render_messages(frame, display, &mut project, &display_fields, input);
                     render_new_project_prompt_menu(frame, dock);
-                },
+                }
                 DisplayMode::Normal => {
-                    let prj = &mut project.as_mut().expect("only attempt to render project after a selection has been made");
-                    render(frame, display, prj, &display_fields);
+                    let prj = &mut project
+                        .as_mut()
+                        .expect("only attempt to render project after a selection has been made");
+                    match render(frame, display, prj, &display_fields) {
+                        Ok(()) => {
+                            let p = prj.package_selector();
+                            let v = prj.version_selector();
+                            let d = prj.distribution_selector();
+                            last_project = Some(Project::new(p, v, d));
+                        }
+                        Err(err) => {
+                            match &last_project {
+                                Some(lprj) => {
+                                    let p = lprj.package_selector();
+                                    let v = lprj.version_selector();
+                                    let d = lprj.distribution_selector();
+                                    project = Some(Project::new(p, v, d));
+                                }
+                                None => {
+                                    project = None;
+                                }
+                            }
+                            mode = DisplayMode::Info(Messages::Error(err.to_string()));
+                        }
+                    }
                     render_menu(frame, dock);
-                },
+                }
             }
         })?;
         if event::poll(std::time::Duration::from_millis(16))? {
@@ -378,158 +437,208 @@ pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()
                     }
                     match &mut mode {
                         DisplayMode::Help => {
-                            mode = if let Some(_) = project {
+                            mode = if project.is_some() {
                                 DisplayMode::Normal
                             } else {
-                                DisplayMode::Input(String::new())
+                                DisplayMode::Input(Messages::Info(String::new()))
                             };
-                        },
+                        }
                         DisplayMode::Info(_) => {
-                            mode = if let Some(_) = project {
+                            mode = if project.is_some() {
                                 DisplayMode::Normal
                             } else {
-                                DisplayMode::Input(String::new())
+                                DisplayMode::Input(Messages::Info(String::new()))
                             };
-                        },
-                        DisplayMode::Input(user_input) => {
+                        }
+                        DisplayMode::Input(user_progress) => {
                             match key.code {
-                                KeyCode::Char(key_char) => {
-                                    user_input.push(key_char);
-                                }
+                                KeyCode::Char(key_char) => match user_progress {
+                                    Messages::Info(user_input)
+                                    | Messages::InfoError((user_input, _)) => {
+                                        user_input.push(key_char)
+                                    }
+                                    Messages::Error(user_error) => {
+                                        mode = DisplayMode::Input(Messages::InfoError((
+                                            key_char.to_string(),
+                                            user_error.to_string(),
+                                        )))
+                                    }
+                                },
                                 KeyCode::Backspace => {
-                                    user_input.pop();
+                                    match user_progress {
+                                        Messages::Info(user_input)
+                                        | Messages::InfoError((user_input, _)) => {
+                                            user_input.pop();
+                                        }
+                                        Messages::Error(_) => (), // backspace with no current input
+                                    }
                                 }
                                 KeyCode::Enter => {
-                                    let mut requested_project = user_input.split_whitespace();
-                                    if let Some(name) = requested_project.next() {
-                                        let version = requested_project.next().map(str::to_string);
-                                        let distribution = requested_project.next().map(str::to_string);
-                                        project = Some(Project::new(name.to_string(), version, distribution));
-                                        mode = DisplayMode::Normal;
-                                    }
-                                    // else can't leave input
+                                    mode = match user_progress {
+                                        Messages::Info(user_input)
+                                        | Messages::InfoError((user_input, _)) => {
+                                            let mut requested_project =
+                                                user_input.split_whitespace();
+                                            if let Some(name) = requested_project.next() {
+                                                let version =
+                                                    requested_project.next().map(str::to_string);
+                                                let distribution =
+                                                    requested_project.next().map(str::to_string);
+                                                project = Some(Project::new(
+                                                    name.to_string(),
+                                                    version,
+                                                    distribution,
+                                                ));
+                                                DisplayMode::Normal
+                                            } else {
+                                                DisplayMode::Input(Messages::InfoError((
+                                                    user_input.to_string(),
+                                                    String::from(
+                                                        "please enter the name of a package",
+                                                    ),
+                                                )))
+                                            }
+                                        }
+                                        Messages::Error(_) => DisplayMode::Input(Messages::Error(
+                                            String::from("please enter the name of a package"),
+                                        )),
+                                    };
                                 }
                                 KeyCode::Esc => {
-                                    if let Some(_) = project {
+                                    if project.is_some() {
                                         mode = DisplayMode::Normal;
-                                    }
-                                    // else can't leave input
-                                }
-                                _ => (),
-                            }
-                        }
-                        DisplayMode::Normal => {
-                            match key.code {
-                                KeyCode::Char('q') => {
-                                    break;
-                                }
-                                KeyCode::Char('?') => {
-                                    mode = DisplayMode::Help;
-                                }
-                                KeyCode::Char(' ') => {
-                                    mode = DisplayMode::Input(String::new());
-                                }
-                                KeyCode::Char('n') => {
-                                    display_fields.name = true;
-                                }
-                                KeyCode::Char('N') => {
-                                    display_fields.name = false;
-                                }
-                                KeyCode::Char('v') => {
-                                    display_fields.versions = true;
-                                }
-                                KeyCode::Char('V') => {
-                                    display_fields.versions = false;
-                                }
-                                KeyCode::Char('t') => {
-                                    display_fields.time = true;
-                                }
-                                KeyCode::Char('T') => {
-                                    display_fields.time = false;
-                                }
-                                KeyCode::Char('s') => {
-                                    display_fields.summary = true;
-                                }
-                                KeyCode::Char('S') => {
-                                    display_fields.summary = false;
-                                }
-                                KeyCode::Char('l') => {
-                                    display_fields.license = true;
-                                }
-                                KeyCode::Char('L') => {
-                                    display_fields.license = false;
-                                }
-                                KeyCode::Char('u') => {
-                                    display_fields.urls = true;
-                                }
-                                KeyCode::Char('U') => {
-                                    display_fields.urls = false;
-                                }
-                                KeyCode::Char('k') => {
-                                    display_fields.keywords = true;
-                                }
-                                KeyCode::Char('K') => {
-                                    display_fields.keywords = false;
-                                }
-                                KeyCode::Char('c') => {
-                                    display_fields.classifiers = true;
-                                }
-                                KeyCode::Char('C') => {
-                                    display_fields.classifiers = false;
-                                }
-                                KeyCode::Char('a') => {
-                                    if display_fields.artifacts < 4 {
-                                        display_fields.artifacts += 1;
-                                    }
-                                }
-                                KeyCode::Char('A') => {
-                                    if display_fields.artifacts > 0 {
-                                        display_fields.artifacts -= 1;
-                                    }
-                                }
-                                KeyCode::Char('d') => {
-                                    display_fields.dependencies = true;
-                                }
-                                KeyCode::Char('D') => {
-                                    display_fields.dependencies = false;
-                                }
-                                KeyCode::Char('r') => {
-                                    if display_fields.readme < 2 {
-                                        display_fields.readme += 1;
-                                    }
-                                }
-                                KeyCode::Char('R') => {
-                                    if display_fields.readme > 0 {
-                                        display_fields.readme -= 1;
-                                    }
-                                }
-                                KeyCode::Char('p') => {
-                                    if key.modifiers.contains(KeyModifiers::CONTROL) {
-                                        if let Some(prj) = &project {
-                                            mode = DisplayMode::Info(encode_cli(prj, &display_fields));
-                                            if key.modifiers.contains(KeyModifiers::SHIFT) {
-                                                break;
-                                            }
-                                        } else {
-                                            // TODO: should be an error. Error popup should be more generic
-                                            mode = DisplayMode::Info("Please select a project before printing".into());
-                                        }
                                     } else {
-                                        display_fields.packages = true;
+                                        mode = match user_progress {
+                                            Messages::Info(user_input)
+                                            | Messages::InfoError((user_input, _)) => {
+                                                DisplayMode::Input(Messages::InfoError((
+                                                    user_input.to_string(),
+                                                    String::from(
+                                                        "please enter the name of a package",
+                                                    ),
+                                                )))
+                                            }
+                                            Messages::Error(_) => {
+                                                DisplayMode::Input(Messages::Error(String::from(
+                                                    "please enter the name of a package",
+                                                )))
+                                            }
+                                        };
                                     }
-                                }
-                                KeyCode::Char('P') => {
-                                        display_fields.packages = false;
-                                }
-                                KeyCode::Char('e') => {
-                                    display_fields.executables = true;
-                                }
-                                KeyCode::Char('E') => {
-                                    display_fields.executables = false;
                                 }
                                 _ => (),
                             }
                         }
+                        DisplayMode::Normal => match key.code {
+                            KeyCode::Char('q') => {
+                                break;
+                            }
+                            KeyCode::Char('?') => {
+                                mode = DisplayMode::Help;
+                            }
+                            KeyCode::Char(' ') => {
+                                mode = DisplayMode::Input(Messages::Info(String::new()));
+                            }
+                            KeyCode::Char('n') => {
+                                display_fields.name = true;
+                            }
+                            KeyCode::Char('N') => {
+                                display_fields.name = false;
+                            }
+                            KeyCode::Char('v') => {
+                                display_fields.versions = true;
+                            }
+                            KeyCode::Char('V') => {
+                                display_fields.versions = false;
+                            }
+                            KeyCode::Char('t') => {
+                                display_fields.time = true;
+                            }
+                            KeyCode::Char('T') => {
+                                display_fields.time = false;
+                            }
+                            KeyCode::Char('s') => {
+                                display_fields.summary = true;
+                            }
+                            KeyCode::Char('S') => {
+                                display_fields.summary = false;
+                            }
+                            KeyCode::Char('l') => {
+                                display_fields.license = true;
+                            }
+                            KeyCode::Char('L') => {
+                                display_fields.license = false;
+                            }
+                            KeyCode::Char('u') => {
+                                display_fields.urls = true;
+                            }
+                            KeyCode::Char('U') => {
+                                display_fields.urls = false;
+                            }
+                            KeyCode::Char('k') => {
+                                display_fields.keywords = true;
+                            }
+                            KeyCode::Char('K') => {
+                                display_fields.keywords = false;
+                            }
+                            KeyCode::Char('c') => {
+                                display_fields.classifiers = true;
+                            }
+                            KeyCode::Char('C') => {
+                                display_fields.classifiers = false;
+                            }
+                            KeyCode::Char('a') => {
+                                if display_fields.artifacts < 4 {
+                                    display_fields.artifacts += 1;
+                                }
+                            }
+                            KeyCode::Char('A') => {
+                                if display_fields.artifacts > 0 {
+                                    display_fields.artifacts -= 1;
+                                }
+                            }
+                            KeyCode::Char('d') => {
+                                display_fields.dependencies = true;
+                            }
+                            KeyCode::Char('D') => {
+                                display_fields.dependencies = false;
+                            }
+                            KeyCode::Char('r') => {
+                                if display_fields.readme < 2 {
+                                    display_fields.readme += 1;
+                                }
+                            }
+                            KeyCode::Char('R') => {
+                                if display_fields.readme > 0 {
+                                    display_fields.readme -= 1;
+                                }
+                            }
+                            KeyCode::Char('p') => {
+                                if key.modifiers.contains(KeyModifiers::CONTROL) {
+                                    mode = DisplayMode::Info(Messages::Info(encode_cli(
+                                        project.as_ref().expect(
+                                            "normal mode should alway have a project loaded",
+                                        ),
+                                        &display_fields,
+                                    )));
+                                    if key.modifiers.contains(KeyModifiers::SHIFT) {
+                                        break;
+                                    }
+                                } else {
+                                    display_fields.packages = true;
+                                }
+                            }
+                            KeyCode::Char('P') => {
+                                display_fields.packages = false;
+                            }
+                            KeyCode::Char('e') => {
+                                display_fields.executables = true;
+                            }
+                            KeyCode::Char('E') => {
+                                display_fields.executables = false;
+                            }
+                            _ => (),
+                        },
                     }
                 }
             }

@@ -235,11 +235,19 @@ fn main() -> Result<()> {
         executables: cli.executables,
     };
 
-    let project = cli.project.map(|p| Project::new(p, cli.package_version, cli.dist));
+    let project = cli
+        .project
+        .map(|p| Project::new(p, cli.package_version, cli.dist));
 
     match cli.format {
-        Format::Text => text::display(project.expect("a project is requred to output text"), display_fields)?,
-        Format::Pretty => pretty::display(project.expect("a project is requred to pretty print text"), display_fields)?,
+        Format::Text => text::display(
+            project.expect("a project is requred to output text"),
+            display_fields,
+        )?,
+        Format::Pretty => pretty::display(
+            project.expect("a project is requred to pretty print text"),
+            display_fields,
+        )?,
         Format::Interactive => interactive::run(project, display_fields)?,
     };
 
