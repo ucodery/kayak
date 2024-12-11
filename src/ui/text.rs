@@ -203,8 +203,8 @@ fn format_package_version_details(
         display.push(format_name_version(project.version()?));
     };
 
-    if display_fields.time || project.distribution_was_selected() {
-        let dist = (project.distribution_was_selected()).then_some(project.distribution()?.clone());
+    if display_fields.time || project.distribution_selector().is_some() {
+        let dist = (project.distribution_selector().is_some()).then_some(project.distribution()?.clone());
         display.push(format_dist_time(project.version()?, dist.as_ref()));
     };
 
@@ -229,7 +229,7 @@ fn format_package_version_details(
     };
 
     if display_fields.artifacts >= 1 {
-        if project.distribution_was_selected() {
+        if project.distribution_selector().is_some() {
             display.extend(format_distributions(
                 &vec![project.distribution()?.clone()],
                 display_fields.artifacts,

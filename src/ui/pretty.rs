@@ -78,7 +78,7 @@ fn render_distribution<'a>(
     display_fields: &DisplayFields,
     project: &mut Project,
 ) -> Result<Option<(Constraint, Paragraph<'a>)>> {
-    if !display_fields.name || !project.distribution_was_selected() {
+    if !display_fields.name || !project.is_distribution_loaded() {
         Ok(None)
     } else {
         let dist = if let Ok(d) = project.distribution()?.filename() {
@@ -103,7 +103,7 @@ fn render_time<'a>(
 ) -> Result<Option<(Constraint, Paragraph<'a>)>> {
     if !display_fields.time {
         Ok(None)
-    } else if project.distribution_was_selected() {
+    } else if project.distribution_selector().is_some() {
         Ok(Some((
             Constraint::Length(1),
             Paragraph::new(Line::from(Span::styled(
@@ -272,7 +272,7 @@ fn render_artifacts<'a>(
         return Ok(None);
     }
     let artifacts: Box<dyn Iterator<Item = &DistributionUrl>> =
-        if project.distribution_was_selected() {
+        if project.distribution_selector().is_some() {
             Box::new(iter::once(project.distribution()?))
         } else {
             Box::new(project.version()?.urls.iter())

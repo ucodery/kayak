@@ -12,7 +12,7 @@ use ratatui::widgets::*;
 use std::io::stdout;
 use std::iter;
 
-fn encode_cli(project: &Project, display_fields: &DisplayFields) -> String {
+fn encode_cli(project: &mut Project, display_fields: &DisplayFields) -> String {
     let mut cli = String::from("kayak");
     if display_fields.versions {
         cli += " versions";
@@ -26,9 +26,13 @@ fn encode_cli(project: &Project, display_fields: &DisplayFields) -> String {
             cli += " ";
             cli += &version;
         }
-        if let Some(dist) = project.distribution_selector() {
+        if project.is_distribution_loaded() {
             cli += " ";
-            cli += &dist;
+            if let Ok(d) = &project.distribution().unwrap().filename() {
+                cli += &d.compatibility_tag.to_string();
+            } else {
+                cli += "sdist";
+            }
         }
         if !display_fields.name {
             cli += " -qq";
@@ -362,7 +366,8 @@ enum DisplayMode {
 
 pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()> {
     let mut project = project;
-    let mut last_project: Option<Project> = None;
+    let mut project_loads = false;
+    let mut last_good_project: Option<Project> = None;
     let mut display_fields = display_fields;
     let mut mode = if project.is_some() {
         DisplayMode::Normal
@@ -402,23 +407,10 @@ pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()
                         .expect("only attempt to render project after a selection has been made");
                     match render(frame, display, prj, &display_fields) {
                         Ok(()) => {
-                            let p = prj.package_selector();
-                            let v = prj.version_selector();
-                            let d = prj.distribution_selector();
-                            last_project = Some(Project::new(p, v, d));
+                            project_loads = true;
                         }
                         Err(err) => {
-                            match &last_project {
-                                Some(lprj) => {
-                                    let p = lprj.package_selector();
-                                    let v = lprj.version_selector();
-                                    let d = lprj.distribution_selector();
-                                    project = Some(Project::new(p, v, d));
-                                }
-                                None => {
-                                    project = None;
-                                }
-                            }
+                            project = last_good_project.take();
                             mode = DisplayMode::Info(Messages::Error(err.to_string()));
                         }
                     }
@@ -484,6 +476,9 @@ pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()
                                                     requested_project.next().map(str::to_string);
                                                 let distribution =
                                                     requested_project.next().map(str::to_string);
+                                                if project_loads {
+                                                    last_good_project = project;
+                                                }
                                                 project = Some(Project::new(
                                                     name.to_string(),
                                                     version,
@@ -616,7 +611,7 @@ pub fn run(project: Option<Project>, display_fields: DisplayFields) -> Result<()
                             KeyCode::Char('p') => {
                                 if key.modifiers.contains(KeyModifiers::CONTROL) {
                                     mode = DisplayMode::Info(Messages::Info(encode_cli(
-                                        project.as_ref().expect(
+                                        &mut project.as_mut().expect(
                                             "normal mode should alway have a project loaded",
                                         ),
                                         &display_fields,

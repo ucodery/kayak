@@ -34,12 +34,12 @@ impl Project {
         }
     }
 
-    pub fn version_was_selected(&self) -> bool {
+    pub fn is_version_loaded(&self) -> bool {
         self.version_selector.is_some()
     }
 
-    pub fn distribution_was_selected(&self) -> bool {
-        self.distribution_selector.is_some()
+    pub fn is_distribution_loaded(&self) -> bool {
+        self.distribution.is_some()
     }
 
     pub fn package(&mut self) -> Result<&warehouse::Package> {
@@ -85,6 +85,7 @@ impl Project {
     pub fn distribution(&mut self) -> Result<&warehouse::DistributionUrl> {
         if self.distribution.is_none() {
             self.distribution = if let Some(distribution) = &self.distribution_selector {
+                eprintln!("{:?}", distribution);
                 if distribution == "sdist" {
                     self.select_sdist()
                 } else {
