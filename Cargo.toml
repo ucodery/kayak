@@ -2,7 +2,7 @@
 name = "kayak"
 description = "You ought to know about your artifact's key-data"
 homepage = "https://github.com/ucodery/kayak"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 repository = "https://github.com/ucodery/kayak"
 
@@ -46,7 +46,12 @@ publish-jobs = ["homebrew"]
 # A GitHub repo to push Homebrew formulas to
 tap = "ucodery/homebrew-draft"
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+targets = [
+    "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
+]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
 # Whether to install an updater program
