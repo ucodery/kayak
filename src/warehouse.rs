@@ -140,6 +140,54 @@ impl<'de> Deserialize<'de> for IndexRoot {
     }
 }
 
+#[derive(Deserialize)]
+struct PackageResponse {
+    info: PackageInfo,
+    last_serial: usize,
+    // deprecated but still used by Package; removed entirely from PackageVersion
+    releases: Option<HashMap<String, IgnoredAny>>,
+    urls: Vec<DistributionUrl>,
+    vulnerabilities: Vec<PackageVulnerability>,
+}
+
+
+#[derive(Deserialize)]
+struct PackageInfo {
+    author: Option<String>,
+    author_email: Option<String>,
+    // deprecated
+    //bugtrack_url: Option<String>,
+    classifiers: Vec<String>,
+    description: Option<String>,
+    description_content_type: Option<String>,
+    docs_url: Option<String>,
+    download_url: Option<String>,
+    // deprecated
+    //downloads: HashMap<String, isize>,
+    dynamic: Option<Vec<String>>,
+    home_page: Option<String>,
+    keywords: Option<String>,
+    license: Option<String>,
+    license_expression: Option<String>,
+    license_files: Option<Vec<String>>,
+    maintainer: Option<String>,
+    maintainer_email: Option<String>,
+    name: String,
+    package_url: String,
+    platform: Option<String>,
+    project_url: String,
+    project_urls: Option<HashMap<String, String>>,
+    provides_extra: Option<Vec<String>>,
+    release_url: Option<String>,
+    requires_dist: Option<Vec<String>>,
+    requires_python: Option<String>,
+    summary: Option<String>,
+    version: String,
+    yanked: bool,
+    yanked_reason: Option<String>,
+}
+
+
 /// A Python package as returned by the JSON api
 /// /pypi/{project}/json
 #[derive(Debug)]
@@ -229,48 +277,7 @@ impl<'de> Deserialize<'de> for Package {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct Top {
-            info: Info,
-            //last_serial: usize,
-            releases: HashMap<String, IgnoredAny>,
-            //urls: Vec<DistributionUrl>,
-            //vulnerabilities: Vec<IgnoredAny>,
-        }
-
-        #[derive(Deserialize)]
-        struct Info {
-            author: Option<String>,
-            author_email: Option<String>,
-            // deprecated
-            //bugtrack_url: Option<String>,
-            classifiers: Vec<String>,
-            description: Option<String>,
-            description_content_type: Option<String>,
-            docs_url: Option<String>,
-            download_url: Option<String>,
-            // deprecated
-            //downloads: HashMap<String, isize>,
-            home_page: Option<String>,
-            keywords: Option<String>,
-            license: Option<String>,
-            maintainer: Option<String>,
-            maintainer_email: Option<String>,
-            name: String,
-            package_url: String,
-            platform: Option<String>,
-            project_url: String,
-            project_urls: Option<HashMap<String, String>>,
-            //release_url: Option<String>,
-            requires_dist: Option<Vec<String>>,
-            requires_python: Option<String>,
-            summary: Option<String>,
-            //version: String,
-            yanked: bool,
-            yanked_reason: Option<String>,
-        }
-
-        let top = Top::deserialize(deserializer)?;
+        let top = PackageResponse::deserialize(deserializer)?;
         Ok(Package {
             author: top.info.author,
             author_email: top.info.author_email,
@@ -292,10 +299,9 @@ impl<'de> Deserialize<'de> for Package {
             requires_dist: top.info.requires_dist.unwrap_or_default(),
             requires_python: top.info.requires_python,
             summary: top.info.summary,
-            // versions is yet-to-be implemented directly in the json API
-            // https://github.com/pypi/warehouse/pull/12079
             versions: top
                 .releases
+                .expect("Index did not return deprecated \"releases\" necessary to build versions list")
                 .keys()
                 .map(|v| v.to_string())
                 .collect::<Vec<String>>(),
@@ -397,46 +403,7 @@ impl<'de> Deserialize<'de> for PackageVersion {
     where
         D: Deserializer<'de>,
     {
-        #[derive(Deserialize)]
-        struct Top {
-            info: Info,
-            //last_serial: usize,
-            urls: Vec<DistributionUrl>,
-            vulnerabilities: Vec<PackageVulnerability>,
-        }
-
-        #[derive(Deserialize)]
-        struct Info {
-            author: Option<String>,
-            author_email: Option<String>,
-            // deprecated
-            //bugtrack_url: Option<String>,
-            classifiers: Vec<String>,
-            description: Option<String>,
-            description_content_type: Option<String>,
-            docs_url: Option<String>,
-            download_url: Option<String>,
-            //downloads: HashMap<String, isize>,
-            home_page: Option<String>,
-            keywords: Option<String>,
-            license: Option<String>,
-            maintainer: Option<String>,
-            maintainer_email: Option<String>,
-            name: String,
-            package_url: String,
-            platform: Option<String>,
-            project_url: String,
-            project_urls: Option<HashMap<String, String>>,
-            release_url: Option<String>,
-            requires_dist: Option<Vec<String>>,
-            requires_python: Option<String>,
-            summary: Option<String>,
-            version: String,
-            yanked: bool,
-            yanked_reason: Option<String>,
-        }
-
-        let top = Top::deserialize(deserializer)?;
+        let top = PackageResponse::deserialize(deserializer)?;
         Ok(PackageVersion {
             author: top.info.author,
             author_email: top.info.author_email,
@@ -497,10 +464,12 @@ impl<'de> Deserialize<'de> for DistributionUrl {
     {
         #[derive(Deserialize)]
         struct Url {
-            //comment_text: Option<String>,
+            comment_text: Option<String>,
             digests: DistributionDigest,
+            // deprecated
             //downloads: HashMap<String, isize>,
             filename: String,
+            // deprecated
             //has_sig: bool,
             md5_digest: String,
             packagetype: String,
@@ -541,12 +510,12 @@ pub struct DistributionDigest {
 
 #[derive(Debug, Deserialize)]
 pub struct PackageVulnerability {
-    pub id: String,
-    pub source: String,
-    pub link: String,
     pub aliases: Vec<String>,
     pub details: String,
     pub summary: Option<String>,
     pub fixed_in: Vec<String>,
+    pub id: String,
+    pub link: String,
+    pub source: String,
     pub withdrawn: Option<String>,
 }
