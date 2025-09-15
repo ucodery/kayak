@@ -1,6 +1,6 @@
-#![deny(unused_crate_dependencies)]
 #![deny(unused_extern_crates)]
 
+use kayak as _;
 use crate::picker::Project;
 use crate::ui::{interactive, pretty, text};
 use anyhow::Result;

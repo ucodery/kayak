@@ -1,7 +1,7 @@
-//! A Serde deserializer for PEP-691 complaint package indexes, with a focus on how pypi.org
-//! specifically encodes metadata
+//! A Serde deserializer for the PyPI-specific JSON API
+//! https://docs.pypi.org/api/json/
 // Look at warehouse's _json_data for the practical implementation
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{BinaryHeap, HashMap};
 use std::error::Error as ErrorTrait;
 use std::fmt;
 use std::str::FromStr;
@@ -16,8 +16,6 @@ use url::Url;
 
 use super::distribution;
 
-pub const MAJOR_API_VERSION: u8 = 1;
-pub const MINOR_API_VERSION: u8 = 0;
 pub const PYPI_URI: &str = "https://pypi.org";
 
 #[derive(Debug)]
@@ -38,108 +36,6 @@ impl fmt::Display for Error {
 }
 
 impl ErrorTrait for Error {}
-
-/// The response from a Package Index root URL
-#[derive(Debug)]
-struct IndexRoot {
-    api_version: String,
-    projects: Vec<String>,
-}
-
-impl IndexRoot {
-    fn fetch(index: &str) -> aResult<Self> {
-        let index = Url::parse(index)?;
-        if index.cannot_be_a_base() {
-            return Err(Error::NotFound)?;
-        }
-        let response: IndexRoot = ureq::get(index.as_str()).call()?.into_json()?;
-        Ok(response)
-    }
-}
-
-pub fn fetch_index_version(index: &str) -> aResult<String> {
-    let metadata = IndexRoot::fetch(index)?;
-    Ok(metadata.api_version)
-}
-
-pub enum SupportLevel {
-    /// This index is fully supported by this client
-    Supported,
-    /// This index may provide additional metadata that will be dropped by this client
-    SomewhatSupported,
-    /// This index is not compatible with this client
-    Unsupported,
-}
-
-pub fn index_is_supported(index: &str) -> aResult<SupportLevel> {
-    let api_version = fetch_index_version(index)?;
-    let mut version_parts = api_version.split('.');
-    let major = if let Ok(v) = version_parts
-        .next()
-        .ok_or(Error::InvalidVersion)?
-        .parse::<u8>()
-    {
-        v
-    } else {
-        return Err(Error::InvalidVersion)?;
-    };
-    let minor = if let Ok(v) = version_parts
-        .next()
-        .ok_or(Error::InvalidVersion)?
-        .parse::<u8>()
-    {
-        v
-    } else {
-        return Err(Error::InvalidVersion)?;
-    };
-    if version_parts.next().is_some() {
-        Err(Error::InvalidVersion)?;
-    }
-    if major > MAJOR_API_VERSION {
-        Ok(SupportLevel::Unsupported)
-    } else if minor > MINOR_API_VERSION {
-        Ok(SupportLevel::SomewhatSupported)
-    } else {
-        Ok(SupportLevel::Supported)
-    }
-}
-
-/// Retrieve the names of all projects hosted on this index
-/// Names may or may not be normalized
-pub fn fetch_projects(index: &str) -> aResult<HashSet<String>> {
-    let metadata = IndexRoot::fetch(index)?;
-    Ok(metadata.projects.into_iter().collect())
-}
-
-impl<'de> Deserialize<'de> for IndexRoot {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Top {
-            meta: Meta,
-            projects: Vec<Project>,
-        }
-
-        #[derive(Deserialize)]
-        struct Meta {
-            api_version: String,
-        }
-
-        #[derive(Deserialize)]
-        struct Project {
-            name: String,
-        }
-
-        let top = Top::deserialize(deserializer)?;
-        Ok(Self {
-            api_version: top.meta.api_version,
-            projects: top.projects.into_iter().map(|p| p.name).collect(),
-        })
-    }
-}
-
 #[derive(Deserialize)]
 struct PackageResponse {
     info: PackageInfo,
@@ -149,7 +45,6 @@ struct PackageResponse {
     urls: Vec<DistributionUrl>,
     vulnerabilities: Vec<PackageVulnerability>,
 }
-
 
 #[derive(Deserialize)]
 struct PackageInfo {
@@ -226,7 +121,7 @@ impl Package {
         }
         let package = distribution::normalize_package_name(package)?;
         index.set_path(&format!("pypi/{package}/json"));
-        let response: Package = ureq::get(index.as_str()).call()?.into_json()?;
+        let response: Package = ureq::get(index.as_str()).call()?.body_mut().read_json()?;
         Ok(response)
     }
 
@@ -355,7 +250,7 @@ impl PackageVersion {
             .ok_or(Error::InvalidVersion)?
             .normalize();
         index.set_path(&format!("pypi/{package}/{version}/json"));
-        let response: PackageVersion = ureq::get(index.as_str()).call()?.into_json()?;
+        let response: PackageVersion = ureq::get(index.as_str()).call()?.body_mut().read_json()?;
         Ok(response)
     }
 
