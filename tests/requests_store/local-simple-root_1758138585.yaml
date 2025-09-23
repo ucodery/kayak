@@ -1,0 +1,61 @@
+when:
+  path: /
+  method: GET
+  header:
+  - name: Accept
+    value: application/vnd.pypi.simple.v1+json
+then:
+  status: 200
+  header:
+  - name: content-type
+    value: application/vnd.pypi.simple.v1+json
+  - name: referrer-policy
+    value: origin-when-cross-origin
+  - name: content-security-policy
+    value: default-src 'none'; sandbox allow-top-navigation
+  - name: etag
+    value: '"A7f1OPOyLDyD9kDnYmRBFg"'
+  - name: access-control-allow-origin
+    value: '*'
+  - name: cache-control
+    value: max-age=600, public
+  - name: access-control-allow-methods
+    value: GET
+  - name: access-control-expose-headers
+    value: X-PyPI-Last-Serial
+  - name: access-control-allow-headers
+    value: Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since
+  - name: access-control-max-age
+    value: '86400'
+  - name: accept-ranges
+    value: bytes
+  - name: date
+    value: Wed, 17 Sep 2025 19:49:45 GMT
+  - name: x-pypi-last-serial
+    value: '31311242'
+  - name: x-served-by
+    value: cache-iad-kjyo7100156-IAD, cache-iad-kjyo7100172-IAD, cache-bfi-krnt7300069-BFI
+  - name: x-cache
+    value: MISS, MISS, HIT
+  - name: x-cache-hits
+    value: 0, 0, 0
+  - name: x-timer
+    value: S1758138586.948624,VS0,VE2
+  - name: vary
+    value: Accept-Encoding, Accept
+  - name: strict-transport-security
+    value: max-age=31536000; includeSubDomains; preload
+  - name: x-frame-options
+    value: deny
+  - name: x-xss-protection
+    value: 1; mode=block
+  - name: x-content-type-options
+    value: nosniff
+  - name: x-permitted-cross-domain-policies
+    value: none
+  - name: permissions-policy
+    value: publickey-credentials-create=(self),publickey-credentials-get=(self),accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),execution-while-not-rendered=(),execution-while-out-of-viewport=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),hid=(),identity-credentials-get=(),idle-detection=(),local-fonts=(),magnetometer=(),microphone=(),midi=(),otp-credentials=(),payment=(),picture-in-picture=(),screen-wake-lock=(),serial=(),speaker-selection=(),storage-access=(),usb=(),web-share=(),xr-spatial-tracking=()
+  - name: content-length
+    value: '236'
+  body: |
+    {"meta":{"_last-serial":31311242,"api-version":"1.4"},"projects":[{"_last-serial":13968553,"name":"000"},{"_last-serial":31153558,"name":"numpy"},{"_last-serial":31059077,"name":"pytest"},{"_last-serial":29278580,"name":"setuptools"}]}

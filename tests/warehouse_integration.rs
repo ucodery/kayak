@@ -13,7 +13,7 @@ use kayak::warehouse;
 #[case("Pillow")] // The pillow project has many compiled extensions
 fn fetch_unknown(#[case] pkg_name: &str) {
     let label = format!("local-warehouse-{}", pkg_name);
-    // !test_server
+    // start test server
     let resync = option_env!("RESYNC_TEST_REQUESTS").is_some();
     let store_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
@@ -46,13 +46,12 @@ fn fetch_unknown(#[case] pkg_name: &str) {
     };
 
     let url = server.base_url();
-    //
 
+    // run test
     assert!(kayak::warehouse::Package::fetch(&url, pkg_name).is_ok());
 
-    // !close_server
+    // close server
     if let Some(save) = recording {
         save.save_to(store_path, label).expect("error saving requests for offline testing");
     };
-    //
 }
