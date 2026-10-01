@@ -112,7 +112,7 @@ fn index_supported() {
 }
 
 #[rstest]
-fn fetch_projects() {
+fn fetchX_projects() {
     let label = "local-simple-root";
     // start test server
     let resync = option_env!("RESYNC_TEST_REQUESTS_FOR_SIMPLE").is_some();
@@ -162,4 +162,55 @@ fn fetch_projects() {
     if let Some(save) = recording {
         save.save_to(store_path, label).expect("error saving requests for offline testing");
     };
+}
+
+#[rstest]
+#[case("unknown")]
+#[case("0")]
+#[case("beautifulsoup4")]
+#[case("Pillow")]
+fn fetch_project(#[case] pkg_name: &str) {
+    let label = format!("local-simple-{}", pkg_name);
+    // start test server
+    let resync = option_env!("RESYNC_TEST_REQUESTS_FOR_SIMPLE").is_some();
+    let store_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("requests_store");
+    let server = MockServer::start();
+
+    let recording = if resync {
+        server.forward_to(simple::PYPI_SIMPLE_URI, |rule| {
+            rule.filter(|when| {
+                when.any_request();
+            });
+        });
+        Some(server.record(|rule| {
+            rule.filter(|when| {
+                when.any_request();
+            });
+        }))
+    } else {
+        let historic = fs::read_dir(&store_path).map(|dir|
+            dir.into_iter().filter_map(|entry|
+                if let Ok(Ok(f)) = entry.map(|file| file.file_name().into_string()) {
+                    f.starts_with(&label).then(|| f)
+                } else {
+                    None
+                }
+            ).max()
+        ).expect("error loading saved requests file").expect("error could not find a saved requests file");
+        server.playback(store_path.join(historic));
+        None
+    };
+
+    let url = server.base_url();
+
+    // run test
+    let K = kayak::simple::Package::fetch(&url, &pkg_name);
+
+    // close server
+    if let Some(save) = recording {
+        save.save_to(store_path, label).expect("error saving requests for offline testing");
+    };
+    assert!(K.is_ok());
 }

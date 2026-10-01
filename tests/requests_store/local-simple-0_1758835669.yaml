@@ -1,0 +1,59 @@
+when:
+  path: /
+  method: GET
+  header:
+  - name: Accept
+    value: application/vnd.pypi.simple.v1+json
+then:
+  status: 200
+  header:
+  - name: content-type
+    value: application/vnd.pypi.simple.v1+json
+  - name: etag
+    value: '"xwuFHLajnxjPxgENDZJ4Jg"'
+  - name: access-control-allow-origin
+    value: '*'
+  - name: cache-control
+    value: max-age=600, public
+  - name: access-control-allow-methods
+    value: GET
+  - name: access-control-expose-headers
+    value: X-PyPI-Last-Serial
+  - name: access-control-allow-headers
+    value: Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since
+  - name: access-control-max-age
+    value: '86400'
+  - name: content-security-policy
+    value: default-src 'none'; sandbox allow-top-navigation
+  - name: referrer-policy
+    value: origin-when-cross-origin
+  - name: accept-ranges
+    value: bytes
+  - name: date
+    value: Thu, 25 Sep 2025 21:27:49 GMT
+  - name: x-served-by
+    value: cache-iad-kjyo7100177-IAD, cache-iad-kjyo7100172-IAD, cache-bfi-krnt7300044-BFI
+  - name: x-cache
+    value: MISS, MISS, HIT
+  - name: x-cache-hits
+    value: 0, 0, 0
+  - name: x-timer
+    value: S1758835670.894568,VS0,VE1
+  - name: vary
+    value: Accept-Encoding, Accept
+  - name: strict-transport-security
+    value: max-age=31536000; includeSubDomains; preload
+  - name: x-frame-options
+    value: deny
+  - name: x-xss-protection
+    value: 1; mode=block
+  - name: x-content-type-options
+    value: nosniff
+  - name: x-permitted-cross-domain-policies
+    value: none
+  - name: permissions-policy
+    value: publickey-credentials-create=(self),publickey-credentials-get=(self),accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),execution-while-not-rendered=(),execution-while-out-of-viewport=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),hid=(),identity-credentials-get=(),idle-detection=(),local-fonts=(),magnetometer=(),microphone=(),midi=(),otp-credentials=(),payment=(),picture-in-picture=(),screen-wake-lock=(),serial=(),speaker-selection=(),storage-access=(),usb=(),web-share=(),xr-spatial-tracking=()
+  - name: content-length
+    value: '743'
+  body: |
+    {"alternate-locations":[],"files":[{"core-metadata":{"sha256":"83b3dbf04c07d06c377bb2fa69a5bb6fd89f6cdd9911ae8dfa11a78da143141d"},"data-dist-info-metadata":{"sha256":"83b3dbf04c07d06c377bb2fa69a5bb6fd89f6cdd9911ae8dfa11a78da143141d"},"filename":"0-0.0.0-py2.py3-none-any.whl","hashes":{"sha256":"d8c8aeb13d410f713ea132d4268ef3dc1e113be6ec3ef2c31420df5c44e8e634"},"provenance":null,"requires-python":null,"size":1992,"upload-time":"2017-08-06T03:43:27.195869Z","url":"https://files.pythonhosted.org/packages/8c/e6/83748ba1e232167de61f2bf31ec53f4b7acdd1ced52bdf3ea3366ea48132/0-0.0.0-py2.py3-none-any.whl","yanked":false}],"meta":{"_last-serial":3075854,"api-version":"1.4"},"name":"0","project-status":{"status":"active"},"versions":["0.0.0"]}

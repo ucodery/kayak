@@ -1,27 +1,27 @@
 HTTP/2 200 
-access-control-allow-origin: *
-cache-control: max-age=600, public
-access-control-allow-methods: GET
-x-pypi-last-serial: 31311242
 access-control-expose-headers: X-PyPI-Last-Serial
-access-control-allow-headers: Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since
+access-control-allow-methods: GET
+etag: "ZBH0zZx1J0EFXeDq5SfOQw"
 access-control-max-age: 86400
-etag: "A7f1OPOyLDyD9kDnYmRBFg"
 content-security-policy: default-src 'none'; sandbox allow-top-navigation
+x-pypi-last-serial: 3075854
+access-control-allow-headers: Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since
+cache-control: max-age=600, public
+access-control-allow-origin: *
 referrer-policy: origin-when-cross-origin
 accept-ranges: bytes
-date: Wed, 17 Sep 2025 20:01:41 GMT
-x-served-by: cache-iad-kjyo7100046-IAD, cache-iad-kjyo7100076-IAD, cache-bfi-krnt7300069-BFI
-x-cache: MISS, MISS, HIT
+date: Thu, 25 Sep 2025 21:30:20 GMT
+x-served-by: cache-iad-kjyo7100046-IAD, cache-iad-kjyo7100068-IAD, cache-bfi-krnt7300020-BFI
+x-cache: MISS, MISS, MISS
 x-cache-hits: 0, 0, 0
-x-timer: S1758139302.669275,VS0,VE2
+x-timer: S1758835820.058925,VS0,VE126
 content-type: application/vnd.pypi.simple.v1+json
-vary: Accept-Encoding, Accept
+vary: Accept, Accept-Encoding
 strict-transport-security: max-age=31536000; includeSubDomains; preload
 x-frame-options: deny
 x-xss-protection: 1; mode=block
 x-content-type-options: nosniff
 x-permitted-cross-domain-policies: none
 permissions-policy: publickey-credentials-create=(self),publickey-credentials-get=(self),accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),execution-while-not-rendered=(),execution-while-out-of-viewport=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),hid=(),identity-credentials-get=(),idle-detection=(),local-fonts=(),magnetometer=(),microphone=(),midi=(),otp-credentials=(),payment=(),picture-in-picture=(),screen-wake-lock=(),serial=(),speaker-selection=(),storage-access=(),usb=(),web-share=(),xr-spatial-tracking=()
-content-length: 33268303
+content-length: 743
 

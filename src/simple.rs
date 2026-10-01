@@ -21,12 +21,12 @@ const SIMPLE_JSON_MIME: &str = "application/vnd.pypi.simple.v1+json";
 /// The response from a Package Index root URL
 #[derive(Deserialize)]
 struct IndexRoot {
-    meta: IndexRootMeta,
+    meta: IndexMeta,
     projects: Vec<SimpleProject>,
 }
 
 #[derive(Deserialize)]
-struct IndexRootMeta {
+struct IndexMeta {
     #[serde(rename = "_last-serial")]
     last_serial: usize,
     #[serde(rename = "api-version")]
@@ -105,33 +105,74 @@ pub fn fetch_projects(index: &str) -> aResult<HashSet<String>> {
     Ok(metadata.projects.into_iter().map(|p| p.name).collect())
 }
 
-/*
-impl<'de> Deserialize<'de> for IndexRoot {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        struct Top {
-            meta: Meta,
-            projects: Vec<Project>,
-        }
+#[derive(Deserialize)]
+struct PackageStatus {
+    status: String
+}
 
-        #[derive(Deserialize)]
-        struct Meta {
-            api_version: String,
-        }
+// must be kept up to date with algorithms provided by Python's `hashlib`
+// https://packaging.python.org/en/latest/specifications/simple-repository-api/#project-detail
+#[derive(Deserialize)]
+struct ArtifactHash {
+    md5: Option<String>,
+    sha1: Option<String>,
+    sha224: Option<String>,
+    sha256: Option<String>,
+    sha384: Option<String>,
+    sha512: Option<String>
+}
 
-        #[derive(Deserialize)]
-        struct Project {
-            name: String,
-        }
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum BooleanReason {
+    Truth(bool),
+    Reason(String)
+}
 
-        let top = Top::deserialize(deserializer)?;
-        Ok(Self {
-            api_version: top.meta.api_version,
-            projects: top.projects.into_iter().map(|p| p.name).collect(),
-        })
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum BooleanHash {
+    Truth(bool),
+    HashType(ArtifactHash)
+}
+
+#[derive(Deserialize)]
+struct PackageFile {
+    #[serde(rename = "core-metadata")]
+    core_metadata: Option<BooleanHash>,
+    #[serde(rename = "data-dist-info-metadata")]
+    data_dist_info_metadata: Option<BooleanHash>,
+    filename: String,
+    hashes: ArtifactHash,
+    #[serde(rename = "requires-python")]
+    requires_python: Option<String>,
+    size: usize,
+    #[serde(rename = "upload-time")]
+    upload_time: Option<String>,
+    #[serde(rename = "gpg-sig")]
+    gpg_sig: Option<String>,
+    url: String,
+    yanked: Option<BooleanReason>,
+    provenance: Option<String>
+}
+
+#[derive(Deserialize)]
+pub struct Package {
+    meta: IndexMeta,
+    name: String,
+    #[serde(rename = "project-status")]
+    project_status: PackageStatus,
+    versions: Vec<String>,
+    files: Vec<PackageFile>
+}
+
+impl Package {
+    pub fn fetch(index: &str, project: &str) -> aResult<Self> {
+        let index = Url::parse(index)?;
+        if index.cannot_be_a_base() {
+            return Err(Error::NotFound)?;
+        }
+        let response: Package = ureq::get(index.as_str()).header("Accept", SIMPLE_JSON_MIME).call()?.body_mut().read_json()?;
+        Ok(response)
     }
 }
-*/
