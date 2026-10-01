@@ -1,0 +1,59 @@
+when:
+  path: /pypi/0/json
+  method: GET
+then:
+  status: 200
+  header:
+  - name: content-type
+    value: application/json
+  - name: access-control-allow-origin
+    value: '*'
+  - name: access-control-allow-headers
+    value: Content-Type, If-Match, If-Modified-Since, If-None-Match, If-Unmodified-Since
+  - name: access-control-allow-methods
+    value: GET
+  - name: access-control-max-age
+    value: '86400'
+  - name: access-control-expose-headers
+    value: X-PyPI-Last-Serial
+  - name: x-pypi-last-serial
+    value: '3075854'
+  - name: cache-control
+    value: max-age=900, public
+  - name: content-security-policy
+    value: base-uri 'self'; connect-src 'self' https://api.github.com/repos/ https://api.github.com/search/issues https://gitlab.com/api/ https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com fastly-insights.com *.fastly-insights.com *.ethicalads.io https://api.pwnedpasswords.com https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/sre/mathmaps/ https://2p66nmmycsj3.statuspage.io; default-src 'none'; font-src 'self' fonts.gstatic.com; form-action 'self' https://checkout.stripe.com; frame-ancestors 'none'; frame-src 'none'; img-src 'self' https://pypi-camo.freetls.fastly.net/ https://*.google-analytics.com https://*.googletagmanager.com *.fastly-insights.com *.ethicalads.io ethicalads.blob.core.windows.net; script-src 'self' https://*.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com *.fastly-insights.com *.ethicalads.io 'sha256-U3hKDidudIaxBDEzwGJApJgPEf2mWk6cfMWghrAa6i0=' https://cdn.jsdelivr.net/npm/mathjax@3.2.2/ 'sha256-1CldwzdEg2k1wTmf7s5RWVd7NMXI/7nxxjJM2C4DqII=' 'sha256-0POaN8stWYQxhzjKS+/eOfbbJ/u4YHO5ZagJvLpMypo='; style-src 'self' fonts.googleapis.com *.ethicalads.io 'sha256-2YHqZokjiizkHi1Zt+6ar0XJ0OeEy/egBnlm+MDMtrM=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=' 'sha256-JLEjeN9e5dGsz5475WyRaoA4eQOdNPxDIeUhclnJDCE=' 'sha256-mQyxHEuwZJqpxCw3SLmc4YOySNKXunyu2Oiz1r3/wAE=' 'sha256-OCf+kv5Asiwp++8PIevKBYSgnNLNUZvxAp4a7wMLuKA=' 'sha256-h5LOiLhk6wiJrGsG5ItM0KimwzWQH/yAcmoJDJL//bY='; worker-src *.fastly-insights.com
+  - name: referrer-policy
+    value: origin-when-cross-origin
+  - name: content-encoding
+    value: gzip
+  - name: etag
+    value: '"TAO5gftxjTzYOXsrvONp3g"'
+  - name: accept-ranges
+    value: bytes
+  - name: date
+    value: Mon, 15 Sep 2025 22:21:04 GMT
+  - name: x-served-by
+    value: cache-iad-kcgs7200131-IAD, cache-bfi-krnt7300032-BFI
+  - name: x-cache
+    value: HIT, HIT
+  - name: x-cache-hits
+    value: 6348, 0
+  - name: x-timer
+    value: S1757974865.583080,VS0,VE1
+  - name: vary
+    value: Accept-Encoding
+  - name: strict-transport-security
+    value: max-age=31536000; includeSubDomains; preload
+  - name: x-frame-options
+    value: deny
+  - name: x-xss-protection
+    value: 1; mode=block
+  - name: x-content-type-options
+    value: nosniff
+  - name: x-permitted-cross-domain-policies
+    value: none
+  - name: permissions-policy
+    value: publickey-credentials-create=(self),publickey-credentials-get=(self),accelerometer=(),ambient-light-sensor=(),autoplay=(),battery=(),camera=(),display-capture=(),document-domain=(),encrypted-media=(),execution-while-not-rendered=(),execution-while-out-of-viewport=(),fullscreen=(),gamepad=(),geolocation=(),gyroscope=(),hid=(),identity-credentials-get=(),idle-detection=(),local-fonts=(),magnetometer=(),microphone=(),midi=(),otp-credentials=(),payment=(),picture-in-picture=(),screen-wake-lock=(),serial=(),speaker-selection=(),storage-access=(),usb=(),web-share=(),xr-spatial-tracking=()
+  - name: content-length
+    value: '874'
+  body_base64: H4sIAAAAAAAC/+1V32+kNhB+71+B/Lw/MAaW5akn9SXqNYmUqyo1jZCxh8VdMBSbbEm0/3vHwGYT6aQi3dvphJCY8TefZzzfmFeidNGQ9JXw3pZNR1JS8qriLy9cH8hq9mZQc1V9WPv54Fwb0dSIyvuD7bg4Zn2HKN1X1YqIihujCgWdIekj+QWeoWraGrT1Hiy3vfHS1KPe2ruvuNZq3O1GW9ASpPeplwq0AIeZIx3PinxWArQZ/XcPN96ntu2aZwxA+7ebL968jMA7DOAWab2HwViopwjvBulbt4e2CLrvmkPH69rBPmNRPT+M1PcDVq3dV7AMtYkX4naLcGwZahMuxEULcTF5WhEJRnSqtarR2PHfb3+9vfvj9i/tHvJhNRON65fN7NDCpe2yEea9DGRz0lXD5eQj5OoxTnUoEptJPpB0TVeTVSNr+c4+ARydecbQQfNaiQt32dSQtVjHRHyE4dR0jtdZ1SyFlKAwrnYG/7YdoDJddRPNZaVQFZiLE9WtLb7QTXRX+20Y0IvpuB18/GxR/5jKXGdpbWvS7bYdWrVpusMWdfo3CLv1tw5bcVs0XY1ArgfnmFaXBV+xb9m6KVDYGqwOB/Hi7aACbhak5G/wcdwd/NMrPJ5MKmOvNLOzHaUyVW76uubdMBf/jNM56WWkQs/A9REkSQteGbiYWYf5XA7+PPfXQKc4Jsj8XZRE4Vvaoz4muvTxleBNU49iwxJnIakDGDvC8oofIcizIIpxLREQJ2wXJjmnELCAxjsJMS2CvGAURMSKMN9xISUVIKMglwUDzlgcAw8TytzM1zJyxexlvN8l+4SFQRwVPgNacL4TXIZi7wN351DyaVOZiIRDTpkMqV/sKFIilcTABAomBQVKWQ4xCAZFIBgNA18WkQhDSCBmITl/GA0nfyfIi8LW40ms2yHYtANb60bDGrWzOZUVZlFykxl1eDtuTD+bjmdZFbN4p0Emuet+dioBHPfU9eza4jkH8hVlTIIx6gVp6H4frEjfjtNv1VhG4NPd2k/WfvzFZ2nI0sBdiO8wmTJNlsQ+/Tp4Q/dREu//dEEfRD3O7mZKo2zwwpeTxKe6zDYRW4i33yKK7f+0YIHgn85j2uaHnn/o+bvQM178fYW/RJ6rSlnlruzHp/NP/wHk9BJqVQoAAA==

@@ -53,7 +53,10 @@ pub fn fetch(wheel_url: &str) -> Result<Package> {
     let mut record: Result<Record> = Err(anyhow!("no RECORD file found in distribution"));
     let mut metadata: Result<Metadata> = Err(anyhow!("no METADATA file found in distribution"));
     let mut entry_points: Option<EntryPoints> = None;
-    let mut wheel = ureq::get(wheel_url).call()?.into_reader();
+
+    let mut wheel_resp = ureq::get(wheel_url).call()?;
+    let mut wheel = wheel_resp.body_mut().as_reader();
+
     while let Some(zipfile) = read_zipfile_from_stream(&mut wheel)? {
         if let Some(name) = dist_filename(zipfile.name()) {
             if name == "RECORD" {
